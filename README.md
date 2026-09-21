@@ -27,3 +27,9 @@
 
 - **本機網址**：`http://127.0.0.1:8088`
 
+---
+
+## 📋 未來演進路線與待辦事項
+
+系統未來的演進規劃（籌碼面三大法人分析、LINE/Telegram 盤中主動警示推播、資產配置圓餅圖、TradingView 蠟燭圖等）已詳細收錄在 [`TODO.md`](file:///c:/Users/marcochen/Downloads/個人/股市協助工具/TODO.md)。
+
