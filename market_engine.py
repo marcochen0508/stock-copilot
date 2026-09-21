@@ -1,3 +1,4 @@
+import os
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -195,6 +196,241 @@ def get_twse_mis_realtime_batch(codes: List[str]) -> Dict[str, Dict[str, Any]]:
         
     return results
 
+# ---------------------------------------------------------------------------
+# Institutional Trading (三大法人籌碼分析：外資、投信連買連賣、自營商)
+# ---------------------------------------------------------------------------
+INSTITUTIONAL_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache_institutional.json")
+INSTITUTIONAL_CACHE: Dict[str, Any] = {
+    "latest_date": "",
+    "data": {},      # code -> { foreign, trust, dealer, total, date }
+    "history": {},   # date_str -> { code -> { foreign, trust } }
+    "updated_at": ""
+}
+
+def load_institutional_cache():
+    global INSTITUTIONAL_CACHE
+    if os.path.exists(INSTITUTIONAL_CACHE_FILE):
+        try:
+            with open(INSTITUTIONAL_CACHE_FILE, "r", encoding="utf-8") as f:
+                INSTITUTIONAL_CACHE = json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load institutional cache from disk: {e}")
+
+def save_institutional_cache():
+    try:
+        with open(INSTITUTIONAL_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(INSTITUTIONAL_CACHE, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"Failed to save institutional cache to disk: {e}")
+
+load_institutional_cache()
+
+def fetch_twse_t86_single_day(date_str: str) -> Optional[Dict[str, Dict[str, Any]]]:
+    """Fetch TWSE T86 institutional trading data for a specific date (YYYYMMDD)."""
+    url = f"https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date={date_str}&selectType=ALL"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            if data.get("stat") == "OK" and data.get("data"):
+                mapping = {}
+                for row in data.get("data", []):
+                    c = row[0].strip()
+                    try:
+                        f1 = int(row[4].replace(",", ""))
+                        f2 = int(row[7].replace(",", ""))
+                        foreign = (f1 + f2) // 1000  # 換算為張數
+                        trust = int(row[10].replace(",", "")) // 1000
+                        dealer = int(row[11].replace(",", "")) // 1000
+                        total = int(row[18].replace(",", "")) // 1000
+                        mapping[c] = {
+                            "foreign": foreign,
+                            "trust": trust,
+                            "dealer": dealer,
+                            "total": total,
+                            "date": date_str
+                        }
+                    except Exception:
+                        continue
+                return mapping
+    except Exception as e:
+        logger.warning(f"Error fetching TWSE T86 for {date_str}: {e}")
+    return None
+
+def update_institutional_data_if_needed():
+    """Ensure latest trading days institutional data is cached and ready."""
+    global INSTITUTIONAL_CACHE
+    now = datetime.datetime.now()
+    
+    candidate_dates = []
+    d = datetime.date.today()
+    while len(candidate_dates) < 6:
+        if d.weekday() < 5:
+            candidate_dates.append(d.strftime("%Y%m%d"))
+        d -= datetime.timedelta(days=1)
+        
+    latest_avail_date = None
+    for c_date in candidate_dates:
+        if c_date in INSTITUTIONAL_CACHE.get("history", {}):
+            latest_avail_date = c_date
+            break
+        day_data = fetch_twse_t86_single_day(c_date)
+        if day_data:
+            if "history" not in INSTITUTIONAL_CACHE:
+                INSTITUTIONAL_CACHE["history"] = {}
+            INSTITUTIONAL_CACHE["history"][c_date] = day_data
+            latest_avail_date = c_date
+            break
+            
+    if not latest_avail_date:
+        return
+        
+    # Fetch prior 3 trading days for streak calculations
+    idx = candidate_dates.index(latest_avail_date) if latest_avail_date in candidate_dates else 0
+    history_dates_to_fetch = candidate_dates[idx+1:idx+4]
+    for h_date in history_dates_to_fetch:
+        if h_date not in INSTITUTIONAL_CACHE.get("history", {}):
+            h_data = fetch_twse_t86_single_day(h_date)
+            if h_data:
+                INSTITUTIONAL_CACHE["history"][h_date] = h_data
+                
+    INSTITUTIONAL_CACHE["latest_date"] = latest_avail_date
+    INSTITUTIONAL_CACHE["data"] = INSTITUTIONAL_CACHE["history"].get(latest_avail_date, {})
+    INSTITUTIONAL_CACHE["updated_at"] = now.strftime("%Y-%m-%d %H:%M:%S")
+    save_institutional_cache()
+
+def get_institutional_data(code: str) -> Dict[str, Any]:
+    """
+    Get full institutional trading analysis for a stock:
+    Foreign, Investment Trust (投信), Dealers, streak days, and diagnostic status.
+    """
+    clean_code = str(code).strip()
+    if clean_code.isdigit() and len(clean_code) < 4:
+        clean_code = clean_code.zfill(4)
+        
+    if not INSTITUTIONAL_CACHE.get("data"):
+        update_institutional_data_if_needed()
+        
+    latest_data = INSTITUTIONAL_CACHE.get("data", {})
+    entry = latest_data.get(clean_code)
+    
+    if not entry:
+        return {
+            "available": False,
+            "date": INSTITUTIONAL_CACHE.get("latest_date", ""),
+            "foreign": 0,
+            "trust": 0,
+            "dealer": 0,
+            "total": 0,
+            "trust_streak": 0,
+            "foreign_streak": 0,
+            "chips_status": "未揭露/非上市",
+            "chips_badge": "觀望",
+            "chips_color": "#64748b",
+            "chips_summary": "非主要上市集中撮合標的或今日未公布買賣超。"
+        }
+        
+    foreign = entry.get("foreign", 0)
+    trust = entry.get("trust", 0)
+    dealer = entry.get("dealer", 0)
+    total = entry.get("total", 0)
+    date_str = entry.get("date", "")
+    
+    # Calculate Trust & Foreign Streak from history
+    history = INSTITUTIONAL_CACHE.get("history", {})
+    sorted_dates = sorted(history.keys(), reverse=True)
+    
+    trust_streak = 0
+    foreign_streak = 0
+    trust_accum_3d = 0
+    
+    # Trust streak
+    first_trust_dir = 1 if trust > 0 else (-1 if trust < 0 else 0)
+    if first_trust_dir != 0:
+        for d in sorted_dates:
+            d_entry = history[d].get(clean_code)
+            if not d_entry:
+                break
+            t_val = d_entry.get("trust", 0)
+            if (first_trust_dir > 0 and t_val > 0) or (first_trust_dir < 0 and t_val < 0):
+                trust_streak += first_trust_dir
+            else:
+                break
+                
+    # Foreign streak
+    first_foreign_dir = 1 if foreign > 0 else (-1 if foreign < 0 else 0)
+    if first_foreign_dir != 0:
+        for d in sorted_dates:
+            d_entry = history[d].get(clean_code)
+            if not d_entry:
+                break
+            f_val = d_entry.get("foreign", 0)
+            if (first_foreign_dir > 0 and f_val > 0) or (first_foreign_dir < 0 and f_val < 0):
+                foreign_streak += first_foreign_dir
+            else:
+                break
+
+    for d in sorted_dates[:3]:
+        d_entry = history[d].get(clean_code)
+        if d_entry:
+            trust_accum_3d += d_entry.get("trust", 0)
+
+    # Determine Chips Status & Psychology
+    chips_color = "#3b82f6"
+    if foreign > 0 and trust > 0:
+        chips_status = "🔥 土洋同步作多"
+        chips_badge = "土洋齊買"
+        chips_color = "#ef4444"
+        chips_summary = f"外資 (+{foreign:,}張) 與投信 (+{trust:,}張) 雙主力同步大買，法人銀彈集中進駐！"
+    elif trust >= 100 and trust_streak >= 2:
+        chips_status = f"🚀 投信強勢認養 (連買 {trust_streak} 天)"
+        chips_badge = f"投信連買{trust_streak}天"
+        chips_color = "#f97316"
+        chips_summary = f"投信連續 {trust_streak} 日買超（近3日累計 {trust_accum_3d:,}張），典型法人鎖碼標的！"
+    elif trust < 0 and foreign > 0:
+        chips_status = "⚡ 土洋對做 (外買投賣)"
+        chips_badge = "外資買/投信賣"
+        chips_color = "#eab308"
+        chips_summary = f"外資買超 {foreign:,} 張，但投信調節賣出 {abs(trust):,} 張，多空劇烈換手。"
+    elif trust > 0 and foreign < 0:
+        chips_status = "⚡ 土洋對做 (投買外賣)"
+        chips_badge = "投信買/外資賣"
+        chips_color = "#eab308"
+        chips_summary = f"本土投信買超 {trust:,} 張抗衡外資賣壓，留意內資題材股防守力。"
+    elif foreign < 0 and trust < 0:
+        chips_status = "⚠️ 法人提款倒貨 (土洋齊賣)"
+        chips_badge = "雙主力賣超"
+        chips_color = "#22c55e"
+        chips_summary = f"外資賣超 {abs(foreign):,} 張，投信亦調節 {abs(trust):,} 張，主力資金撤退，嚴防多殺多。"
+    elif total > 0:
+        chips_status = "📈 三大法人偏多"
+        chips_badge = "法人買超"
+        chips_color = "#ef4444"
+        chips_summary = f"三大法人合計淨買超 {total:,} 張，籌碼面維持偏多優勢。"
+    else:
+        chips_status = "📉 三大法人偏空"
+        chips_badge = "法人賣超"
+        chips_color = "#22c55e"
+        chips_summary = f"三大法人合計淨賣超 {abs(total):,} 張，籌碼相對發散。"
+
+    formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}" if len(date_str) == 8 else date_str
+
+    return {
+        "available": True,
+        "date": formatted_date,
+        "foreign": foreign,
+        "trust": trust,
+        "dealer": dealer,
+        "total": total,
+        "trust_streak": trust_streak,
+        "foreign_streak": foreign_streak,
+        "trust_accum_3d": trust_accum_3d,
+        "chips_status": chips_status,
+        "chips_badge": chips_badge,
+        "chips_color": chips_color,
+        "chips_summary": chips_summary
+    }
+
 # In-memory caches to accelerate subsequent queries and timeframe switching
 STOCK_EXCHANGE_MAP: Dict[str, str] = {}
 STOCK_DIVIDEND_CACHE: Dict[str, float] = {}
@@ -384,6 +620,7 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
         STOCK_DIVIDEND_CACHE[clean_code] = annual_dividend
 
     dividend_yield = round((annual_dividend / cur_price * 100), 2) if cur_price > 0 else 0.0
+    inst_data = get_institutional_data(clean_code)
 
     return {
         "symbol": target_sym,
@@ -406,7 +643,8 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
         "d": d_val,
         "annual_dividend": annual_dividend,
         "dividend_yield": dividend_yield,
-        "candles": candles
+        "candles": candles,
+        "institutional": inst_data
     }
 
 def diagnose_stock_holding(stock_info: Dict[str, Any], cost_price: float, shares: int = 1000) -> Dict[str, Any]:
@@ -508,6 +746,16 @@ def diagnose_stock_holding(stock_info: Dict[str, Any], cost_price: float, shares
             guidance = f"目前在月線 ({ma20} 元) 下方震盪整理，尚未出現明確轉強信號，先觀望不宜躁進加碼。"
             caution = f"上方第一壓力為月線 {ma20} 元，防守價為 {support} 元。"
 
+    # Enrich guidance with Institutional Chips signals
+    inst = stock_info.get("institutional", {})
+    if inst.get("available"):
+        trust_s = inst.get("trust_streak", 0)
+        chips_status = inst.get("chips_status", "")
+        if trust_s >= 2 or (inst.get("foreign", 0) > 0 and inst.get("trust", 0) > 0):
+            guidance += f" 🏛️【籌碼共振】{chips_status}，主力籌碼高度集中，多頭續抱信心充足！"
+        elif inst.get("foreign", 0) < 0 and inst.get("trust", 0) < 0:
+            caution += f" ⚠️【籌碼提款】{chips_status}，外資投信同步賣超調節，提防主力逢高出貨。"
+
     return {
         "cost_price": cost_price,
         "shares": shares,
@@ -564,6 +812,16 @@ def diagnose_unheld_stock(stock_info: Dict[str, Any]) -> Dict[str, Any]:
         buy_badge = "waiting"
         advice = f"目前在區間 {support} ~ {resistance} 震盪，等待明確突破或拉回守穩訊號。"
         
+    inst = stock_info.get("institutional", {})
+    if inst.get("available"):
+        trust_s = inst.get("trust_streak", 0)
+        chips_status = inst.get("chips_status", "")
+        if trust_s >= 2:
+            buy_status = f"🔥 投信強勢認養買點 ({chips_status})"
+            advice += f" 且投信連續 {trust_s} 日強力吃貨買超，籌碼集中度極高！"
+        elif inst.get("foreign", 0) < 0 and inst.get("trust", 0) < 0:
+            advice += f" 但三大法人今日同步賣超提款 ({chips_status})，需防範主力出貨假突破。"
+
     return {
         "buy_status": buy_status,
         "buy_badge": buy_badge,

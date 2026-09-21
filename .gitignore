@@ -3,6 +3,7 @@ __pycache__/
 *$py.class
 cache_portfolios.json
 cache_macro.json
+cache_institutional.json
 .env
 .DS_Store
 Thumbs.db

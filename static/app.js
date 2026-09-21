@@ -709,6 +709,70 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
   }
   document.getElementById("divFillRating").textContent = (stock.dividend_yield >= 4.0) ? "高殖利率存股標的，具優異除息防守力" : "成長型權值股，以價差回報為主";
 
+  // Institutional Chips Rendering
+  const inst = stock.institutional || {};
+  const chipsBox = document.getElementById("chipsBox");
+  if (chipsBox) {
+    if (inst && inst.available) {
+      chipsBox.style.display = "block";
+      document.getElementById("chipsDate").textContent = inst.date ? `資料日期: ${inst.date}` : "";
+      
+      const tagEl = document.getElementById("chipsStatusTag");
+      tagEl.textContent = inst.chips_status || "三大法人分析";
+      tagEl.style.color = inst.chips_color || "#38bdf8";
+      tagEl.style.borderColor = inst.chips_color || "#38bdf8";
+      tagEl.style.backgroundColor = `${inst.chips_color}22` || "rgba(56, 189, 248, 0.15)";
+      
+      // Foreign
+      const fVal = inst.foreign || 0;
+      const fEl = document.getElementById("chipsForeign");
+      fEl.textContent = `${fVal > 0 ? '+' : ''}${fVal.toLocaleString()} 張`;
+      fEl.className = `m-val ${fVal > 0 ? 'color-up' : (fVal < 0 ? 'color-down' : '')}`;
+      
+      // Trust & Streak
+      const tVal = inst.trust || 0;
+      const tEl = document.getElementById("chipsTrust");
+      tEl.textContent = `${tVal > 0 ? '+' : ''}${tVal.toLocaleString()} 張`;
+      tEl.className = `m-val ${tVal > 0 ? 'color-up' : (tVal < 0 ? 'color-down' : '')}`;
+      
+      const streakEl = document.getElementById("chipsTrustStreak");
+      const streak = inst.trust_streak || 0;
+      if (streak > 0) {
+        streakEl.textContent = `連買 ${streak} 天 🔥`;
+        streakEl.style.display = "inline-flex";
+        streakEl.style.color = "#f97316";
+        streakEl.style.borderColor = "rgba(249, 115, 22, 0.4)";
+      } else if (streak < 0) {
+        streakEl.textContent = `連賣 ${Math.abs(streak)} 天 ⚠️`;
+        streakEl.style.display = "inline-flex";
+        streakEl.style.color = "#22c55e";
+        streakEl.style.borderColor = "rgba(34, 197, 94, 0.4)";
+      } else {
+        streakEl.textContent = "轉折觀望";
+        streakEl.style.display = "inline-flex";
+        streakEl.style.color = "#94a3b8";
+        streakEl.style.borderColor = "rgba(148, 163, 184, 0.3)";
+      }
+
+      // Dealer
+      const dVal = inst.dealer || 0;
+      const dEl = document.getElementById("chipsDealer");
+      dEl.textContent = `${dVal > 0 ? '+' : ''}${dVal.toLocaleString()} 張`;
+      dEl.className = `m-val ${dVal > 0 ? 'color-up' : (dVal < 0 ? 'color-down' : '')}`;
+
+      // Total
+      const totVal = inst.total || 0;
+      const totEl = document.getElementById("chipsTotal");
+      totEl.textContent = `${totVal > 0 ? '+' : ''}${totVal.toLocaleString()} 張`;
+      totEl.className = `m-val ${totVal > 0 ? 'color-up' : (totVal < 0 ? 'color-down' : '')}`;
+
+      // Summary
+      document.getElementById("chipsSummary").textContent = inst.chips_summary || "三大法人數據持續追蹤中。";
+    } else {
+      chipsBox.style.display = "none";
+    }
+  }
+
   // Key Levels
   const isW = (stock.timeframe === "W");
   const lvlMA20El = document.getElementById("lvlMA20");
