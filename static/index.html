@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台股智能決策戰情室 | 全球晨報 x 個人持股健康診斷</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Chart.js and financial plugin for professional interactive K-line -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="theme-tw">
+  <!-- Top Header Navigation -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-logo">
+        <span class="pulse-dot"></span>
+        <div class="logo-icon">📈</div>
+        <div>
+          <h1 class="brand-title">台股智能決策戰情室</h1>
+          <p class="brand-subtitle">AI & Quant Investment Copilot · 美股宏觀 x 家族多帳戶量化診斷</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="sync-status" id="syncStatus">
+        <span class="status-indicator online"></span>
+        <span class="sync-text" id="syncText">已連線 Google 雲端試算表</span>
+      </div>
+      <button class="btn btn-outline" id="btnSyncSheet" title="同步 Google 試算表最新持股">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        <span>同步試算表</span>
+      </button>
+      <button class="btn btn-outline" id="btnConfigSheet" title="設定或更換個人 Google 試算表網址">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>更換試算表</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Global Macro & Morning Sentiment Dashboard -->
+  <section class="macro-section">
+    <div class="macro-header">
+      <div class="section-title">
+        <span class="icon">🌐</span>
+        <h2>美股宏觀先行看板與今日開盤前瞻</h2>
+      </div>
+      <div class="macro-badge-wrap" id="macroBiasBadgeWrap">
+        <span class="label">今日台股開盤動能：</span>
+        <span class="bias-badge" id="macroBiasBadge">分析運算中...</span>
+      </div>
+    </div>
+
+    <!-- Macro Tickers Carousel / Grid -->
+    <div class="macro-cards-grid" id="macroGrid">
+      <div class="card-skeleton">載入美股即時數據中...</div>
+    </div>
+
+    <!-- Morning Briefing Bar -->
+    <div class="morning-briefing-bar" id="morningBriefingBar">
+      <div class="briefing-tag">💡 今日宏觀點評</div>
+      <div class="briefing-text" id="morningBriefingText">正在分析昨夜美股、費城半導體、台積電 ADR 與台幣匯率影響...</div>
+    </div>
+  </section>
+
+  <!-- Main Workstation Layout -->
+  <main class="main-container">
+    <!-- Dedicated Account Switcher Toolbar -->
+    <div class="account-selector-card">
+      <div class="account-selector-header">
+        <div class="selector-title">
+          <span class="icon">💼</span>
+          <h3>選擇檢視戶頭（單人專屬 / 全部合併）：</h3>
+        </div>
+        <div class="account-quick-dropdown">
+          <label for="accountDropdown">快速切換：</label>
+          <select id="accountDropdown" class="account-select-input">
+            <option value="all">👨‍👩‍👧‍👦 全部合併總覽</option>
+            <option value="台北-阿良">👤 台北-阿良</option>
+            <option value="三重-甘露涓">👤 三重-甘露涓</option>
+            <option value="景維">👤 景維</option>
+            <option value="阿輝">👤 阿輝</option>
+            <option value="watchlist">🎯 未持股觀察雷達</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Prominent Person Tab Buttons -->
+      <div class="portfolio-tabs-wrapper">
+        <div class="tabs-list" id="personTabs">
+          <button class="tab-btn active" data-tab="all">
+            <span class="tab-icon">👨‍👩‍👧‍👦</span>
+            <span class="tab-text">全部合併總覽</span>
+          </button>
+          <!-- Dynamically filled with person buttons + count badges -->
+          <button class="tab-btn watchlist-tab" data-tab="watchlist">
+            <span class="tab-icon">🎯</span>
+            <span class="tab-text">未持股觀察雷達</span>
+          </button>
+        </div>
+
+        <div class="search-bar-wrap">
+          <div class="search-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="stockSearchInput" placeholder="輸入台股代號（例: 2330、2603）" autocomplete="off">
+            <button class="btn-search" id="btnStockSearch">立即診斷</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Viewing Banner -->
+      <div class="current-account-banner" id="currentAccountBanner">
+        <span class="banner-badge">目前檢視中</span>
+        <span class="banner-text" id="bannerAccountTitle">【全部合併總覽】跨帳戶資產與持股健康度總覽</span>
+      </div>
+    </div>
+
+    <!-- Summary Asset Cards (Total Cost, Value, PnL, ROI, Dividends) -->
+    <div class="summary-cards-grid" id="summaryCards">
+      <div class="summary-card">
+        <div class="card-label">總持股總成本</div>
+        <div class="card-value" id="valTotalCost">NT$ --</div>
+        <div class="card-sub">累計已投入資金</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">目前持股市值</div>
+        <div class="card-value" id="valTotalValue">NT$ --</div>
+        <div class="card-sub">即時估算總現值</div>
+      </div>
+      <div class="summary-card highlight">
+        <div class="card-label">未實現總損益</div>
+        <div class="card-value" id="valTotalPnL">--</div>
+        <div class="card-sub" id="subTotalPnL">持股總損益金額</div>
+      </div>
+      <div class="summary-card highlight">
+        <div class="card-label">整體總報酬率</div>
+        <div class="card-value" id="valTotalROI">--%</div>
+        <div class="card-sub">資產淨回報率</div>
+      </div>
+      <div class="summary-card dividend-highlight">
+        <div class="card-label">💰 預估年領股利 (現金流)</div>
+        <div class="card-value color-gold" id="valTotalDividend">NT$ --</div>
+        <div class="card-sub" id="subTotalDividend">預估年化殖利率 --%</div>
+      </div>
+    </div>
+
+    <!-- Active View Container -->
+    <div class="content-split-layout">
+      <!-- Left / Top: Stock Holdings Table / Watchlist -->
+      <div class="table-section-card">
+        <div class="card-section-header">
+          <h3 id="tableSectionTitle">持股健康度與個人化決策清單</h3>
+          <span class="pill-info" id="tableCountBadge">共 0 檔</span>
+        </div>
+
+        <!-- Interactive Watchlist Manager Toolbar (visible only on watchlist tab) -->
+        <div class="watchlist-manager-toolbar" id="watchlistToolbar" style="display: none;">
+          <div class="add-stock-box">
+            <span class="icon">➕</span>
+            <input type="text" id="inputAddWatchlist" placeholder="輸入台股代號（例: 3231、00919、2603）" maxlength="10">
+            <button class="btn btn-primary btn-sm" id="btnAddWatchlist">加入觀察名單</button>
+          </div>
+          <div class="quick-tags">
+            <span class="quick-label">熱門快選：</span>
+            <button class="tag-pill" data-code="2454" data-name="聯發科">2454 聯發科</button>
+            <button class="tag-pill" data-code="2382" data-name="廣達">2382 廣達</button>
+            <button class="tag-pill" data-code="3231" data-name="緯創">3231 緯創</button>
+            <button class="tag-pill" data-code="00878" data-name="國泰永續高股息">00878 高股息</button>
+            <button class="tag-pill" data-code="00919" data-name="群益精選高息">00919 高股息</button>
+            <button class="tag-pill" data-code="2603" data-name="長榮">2603 長榮</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="stock-table" id="stockTable">
+            <thead>
+              <tr>
+                <th>代號 / 名稱</th>
+                <th class="th-owner" id="thOwner">持有人</th>
+                <th>股數</th>
+                <th>成本價</th>
+                <th>目前現價</th>
+                <th>今日漲跌</th>
+                <th>未實現損益</th>
+                <th>報酬率</th>
+                <th>現金殖利率</th>
+                <th>預估年股利</th>
+                <th>智能決策</th>
+                <th>關鍵防守價</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody">
+              <tr>
+                <td colspan="13" class="text-center">資料載入中...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Dedicated Stock Detail Large Lightbox Modal Window (點擊股票展開大視窗) -->
+  <div class="modal-overlay modal-stock-overlay" id="stockModal">
+    <div class="modal-window modal-stock-window" id="chartCard">
+      <div class="modal-stock-header">
+        <div class="stock-info-main">
+          <div class="stock-title-row">
+            <h2 id="chartStockTitle">2330 台積電</h2>
+            <div class="stock-price-box">
+              <span class="price-large" id="chartStockPrice">NT$ --</span>
+              <span class="badge-change" id="chartStockChange">-- (--%)</span>
+            </div>
+          </div>
+        </div>
+        <div class="chart-actions">
+          <div class="timeframe-selector">
+            <button class="tf-btn active" data-tf="D">日K</button>
+            <button class="tf-btn" data-tf="W">週K</button>
+            <button class="btn-close-stock-modal" id="btnCloseStockModal" title="關閉視窗 (可按 Esc 或點擊背景空白處)">✕ 關閉視窗 (Esc)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-stock-body">
+        <!-- Diagnostic Alert Banner -->
+        <div class="diagnostic-banner" id="diagBanner">
+          <div class="diag-action-tag" id="diagActionTag">安心續抱</div>
+          <div class="diag-content">
+            <div class="diag-guidance" id="diagGuidance">均線維持多頭排列，股價站穩月線之上，續抱讓獲利持續奔跑。</div>
+            <div class="diag-caution" id="diagCaution">防守線設在月線支撐，未跌破前不預設立場。</div>
+          </div>
+        </div>
+
+        <!-- Dividend & Yield Policy Banner -->
+        <div class="dividend-diagnostic-box" id="dividendBox">
+          <div class="div-header">
+            <span class="div-icon">🎁</span>
+            <span class="div-title">歷年股利與除權息政策評估</span>
+            <span class="div-tag" id="divStockYieldBadge">殖利率 --%</span>
+          </div>
+          <div class="div-metrics-grid">
+            <div class="div-metric">
+              <span class="m-label">最新年配息：</span>
+              <span class="m-val" id="divAnnualPayout">-- 元/股</span>
+            </div>
+            <div class="div-metric">
+              <span class="m-label">現金殖利率：</span>
+              <span class="m-val color-gold" id="divStockYield">--%</span>
+            </div>
+            <div class="div-metric">
+              <span class="m-label">預估年領股利：</span>
+              <span class="m-val color-up" id="divUserEstPayout">NT$ --</span>
+            </div>
+            <div class="div-metric">
+              <span class="m-label">除權息策略：</span>
+              <span class="m-val" id="divFillRating">近3年填息率高，具下檔防護</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Technical Key Levels Bar -->
+        <div class="key-levels-bar">
+          <div class="level-item">
+            <span class="lvl-name">20MA月線：</span>
+            <span class="lvl-val" id="lvlMA20">--</span>
+          </div>
+          <div class="level-item">
+            <span class="lvl-name">關鍵支撐：</span>
+            <span class="lvl-val color-green" id="lvlSupport">--</span>
+          </div>
+          <div class="level-item">
+            <span class="lvl-name">短線壓力：</span>
+            <span class="lvl-val color-red" id="lvlResistance">--</span>
+          </div>
+          <div class="level-item">
+            <span class="lvl-name">KD指標：</span>
+            <span class="lvl-val" id="lvlKD">K: -- / D: --</span>
+          </div>
+          <div class="level-item">
+            <span class="lvl-name">RSI強弱：</span>
+            <span class="lvl-val" id="lvlRSI">--</span>
+          </div>
+        </div>
+
+        <!-- Candlestick Chart Canvas -->
+        <div class="chart-canvas-container" id="chartCanvasContainer">
+          <canvas id="klineCanvas"></canvas>
+          <div class="chart-loading-overlay" id="chartLoadingOverlay">
+            <div class="chart-spinner-ring"></div>
+            <div class="chart-loader-text" id="chartLoaderText">正在切換 K 線數據...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sheet Configuration Modal -->
+  <div class="modal-overlay" id="sheetConfigModal">
+    <div class="modal-window" style="max-width: 580px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon">📊</span>
+          <h3>設定個人 Google 雲端試算表</h3>
+        </div>
+        <button class="btn-close" id="btnCloseSheetModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 16px;">
+          請將您在 Google 雲端硬碟建立的股票記帳表網址貼在下方。<br>
+          <span style="color: #38bdf8;">💡 提示：請確保該試算表的共用權限設為「知道連結的人均可檢視」。</span>
+        </p>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px;">Google 試算表完整網址：</label>
+          <input type="text" id="customSheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/1-xxxx.../edit" style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #f8fafc; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-size: 0.82rem; color: #94a3b8; line-height: 1.5;">
+          <strong>表單格式支援：</strong><br>
+          • 欄位名稱支援中文或英文（代號、名稱、股數/張數、成本價/買價/均價）。<br>
+          • 支援多人多頁籤分頁（不同親友分開記錄，系統自動彙整總覽）。
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn btn-outline" id="btnResetDefaultSheet" style="font-size: 0.82rem; color: #94a3b8;">重設為預設範例表</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" id="btnCancelSheetModal">取消</button>
+          <button class="btn btn-primary" id="btnSaveSheetConfig">儲存並同步</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

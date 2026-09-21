@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*$py.class
+cache_portfolios.json
+cache_macro.json
+.env
+.DS_Store
+Thumbs.db
