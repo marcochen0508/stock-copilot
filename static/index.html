@@ -7,11 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <!-- Chart.js and financial plugin for professional interactive K-line -->
+  <!-- Chart.js for Sector Doughnut and general charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
+  <!-- TradingView Lightweight Charts (Professional Candlestick + Volume) -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="theme-tw">
@@ -146,6 +145,56 @@
         <div class="card-label">💰 預估年領股利 (現金流)</div>
         <div class="card-value color-gold" id="valTotalDividend">NT$ --</div>
         <div class="card-sub" id="subTotalDividend">預估年化殖利率 --%</div>
+      </div>
+    </div>
+
+    <!-- Sector Exposure & Asset Risk Management Dashboard -->
+    <div class="sector-risk-card" id="sectorRiskSection">
+      <div class="sector-risk-header">
+        <div class="risk-header-title">
+          <span class="icon">📊</span>
+          <h3>資產配置與族群曝險戰情室</h3>
+          <span class="risk-account-tag" id="riskAccountTag">全部合併總覽</span>
+        </div>
+        <div class="risk-health-badge health-good" id="riskHealthBadge">
+          <span class="shield-icon" id="riskHealthIcon">🛡️</span>
+          <span id="riskHealthText">族群結構健康</span>
+        </div>
+      </div>
+      
+      <div class="sector-risk-body">
+        <!-- Left: Sector Doughnut Chart -->
+        <div class="sector-chart-wrapper">
+          <div class="chart-canvas-box">
+            <canvas id="sectorDoughnutCanvas"></canvas>
+            <div class="chart-center-info">
+              <span class="center-label">持股市值</span>
+              <span class="center-val" id="riskCenterValue">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle: Dynamic Sector Progress Bars -->
+        <div class="sector-bars-container" id="sectorBarsList">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Right: Cash Reserve & Portfolio Risk Assessment -->
+        <div class="sector-advice-box">
+          <div class="cash-watermark-row">
+            <div class="cash-input-group">
+              <span class="cash-label">💵 備用現金：</span>
+              <input type="number" id="inputCashReserve" class="cash-input" value="50" min="0" step="5" title="點擊可修改目前手邊備用現金（單位：萬元）">
+              <span class="unit">萬元</span>
+            </div>
+            <div class="cash-ratio-pill" id="cashRatioPill">
+              股票 --% : 現金 --%
+            </div>
+          </div>
+          <div class="risk-diagnostic-message" id="riskDiagMessage">
+            正在計算族群曝險與持股集中度...
+          </div>
+        </div>
       </div>
     </div>
 
@@ -325,12 +374,27 @@
           </div>
         </div>
 
-        <!-- Candlestick Chart Canvas -->
-        <div class="chart-canvas-container" id="chartCanvasContainer">
-          <canvas id="klineCanvas"></canvas>
-          <div class="chart-loading-overlay" id="chartLoadingOverlay">
-            <div class="chart-spinner-ring"></div>
-            <div class="chart-loader-text" id="chartLoaderText">正在切換 K 線數據...</div>
+        <!-- TradingView Interactive Chart Container with OHLC Crosshair Bar -->
+        <div class="tv-chart-wrapper">
+          <div class="tv-ohlc-bar" id="tvOhlcBar">
+            <span class="tv-timeframe-tag" id="tvTfTag">日K</span>
+            <div class="tv-ohlc-items">
+              <span class="tv-item">開 <b id="tvOpen">--</b></span>
+              <span class="tv-item">高 <b id="tvHigh">--</b></span>
+              <span class="tv-item">低 <b id="tvLow">--</b></span>
+              <span class="tv-item">收 <b id="tvClose">--</b></span>
+              <span class="tv-item">漲跌 <b id="tvChange">--</b></span>
+              <span class="tv-item">量 <b id="tvVol">-- 張</b></span>
+            </div>
+            <span class="tv-hint">💡 支援滑鼠滾輪/雙指縮放與拖曳</span>
+          </div>
+          
+          <div class="chart-canvas-container" id="chartCanvasContainer">
+            <div id="tvChartContainer" style="width: 100%; height: 100%;"></div>
+            <div class="chart-loading-overlay" id="chartLoadingOverlay">
+              <div class="chart-spinner-ring"></div>
+              <div class="chart-loader-text" id="chartLoaderText">正在切換 K 線數據...</div>
+            </div>
           </div>
         </div>
       </div>

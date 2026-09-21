@@ -528,6 +528,295 @@ body {
   color: var(--text-muted);
 }
 
+/* Sector Exposure & Asset Risk Management Dashboard */
+.sector-risk-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1.5px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  margin-bottom: 28px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.sector-risk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.risk-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.risk-header-title .icon {
+  font-size: 20px;
+}
+
+.risk-header-title h3 {
+  font-size: 17px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.risk-account-tag {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.risk-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.risk-health-badge.health-good {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.risk-health-badge.health-warning {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.risk-health-badge.health-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.sector-risk-body {
+  display: grid;
+  grid-template-columns: 210px 1fr 310px;
+  gap: 26px;
+  align-items: center;
+}
+
+@media (max-width: 1100px) {
+  .sector-risk-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sector-chart-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chart-canvas-box {
+  width: 180px;
+  height: 180px;
+  position: relative;
+}
+
+.chart-center-info {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.chart-center-info .center-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.chart-center-info .center-val {
+  font-size: 14px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #f8fafc;
+}
+
+.sector-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.sector-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sector-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sector-name-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sector-color-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sector-val-box {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.sector-val-box b {
+  color: #f8fafc;
+}
+
+.sector-progress-track {
+  width: 100%;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sector-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sector-advice-box {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 3.5px solid #3b82f6;
+}
+
+.cash-watermark-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cash-input-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.cash-input {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #f8fafc;
+  padding: 4px 8px;
+  border-radius: 6px;
+  width: 70px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.cash-ratio-pill {
+  display: inline-flex;
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.risk-diagnostic-message {
+  font-size: 13.5px;
+  color: #e2e8f0;
+  line-height: 1.55;
+}
+
+/* TradingView OHLC Crosshair Bar */
+.tv-chart-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.tv-ohlc-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  flex-wrap: wrap;
+  margin-bottom: -1px;
+  z-index: 2;
+}
+
+.tv-timeframe-tag {
+  background: #3b82f6;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.tv-ohlc-items {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  flex-wrap: wrap;
+}
+
+.tv-item {
+  color: var(--text-dim);
+}
+
+.tv-item b {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.tv-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* Content Layout: Clean Stacked Top-Bottom (上下分層) Layout */
 .content-split-layout {
   display: flex;

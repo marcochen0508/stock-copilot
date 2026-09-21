@@ -9,6 +9,60 @@ const stockDetailClientCache = new Map(); // key: `${code}_${tf}` -> { data, tim
 const STOCK_CLIENT_CACHE_TTL = 300000; // 5 minutes
 let stockDetailAbortController = null;
 
+// TradingView Lightweight Charts Instances
+let tvChart = null;
+let tvCandleSeries = null;
+let tvVolumeSeries = null;
+let tvMa5Series = null;
+let tvMa20Series = null;
+let tvMa60Series = null;
+
+// Sector Analysis & Asset Risk Management
+let sectorDoughnutChart = null;
+
+const SECTOR_MAP = {
+  // 半導體 / IC設計
+  "2330": "半導體", "2454": "半導體", "2303": "半導體", "3037": "半導體", "2379": "半導體",
+  "3443": "半導體", "3661": "半導體", "6415": "半導體", "6770": "半導體", "5347": "半導體", "2408": "半導體",
+  // AI伺服器 / 電子代工
+  "2317": "AI代工", "2382": "AI代工", "3231": "AI代工", "2356": "AI代工", "6669": "AI代工",
+  "2376": "AI代工", "2357": "AI代工", "2301": "AI代工",
+  // 綠能 / 散熱 / 電源
+  "2308": "散熱綠能", "3017": "散熱綠能", "3324": "散熱綠能", "1519": "散熱綠能", "1503": "散熱綠能",
+  // 金融金控
+  "2881": "金融金控", "2882": "金融金控", "2886": "金融金控", "2891": "金融金控", "2884": "金融金控",
+  "2890": "金融金控", "2885": "金融金控", "2880": "金融金控", "2883": "金融金控", "2887": "金融金控", "5880": "金融金控",
+  // 航運 / 傳產
+  "2603": "航運傳產", "2609": "航運傳產", "2615": "航運傳產", "2618": "航運傳產", "1101": "航運傳產", "1301": "航運傳產", "2002": "航運傳產",
+  // 高股息 ETF
+  "0056": "高股息ETF", "00878": "高股息ETF", "00919": "高股息ETF", "00929": "高股息ETF", "00940": "高股息ETF", "00713": "高股息ETF", "00915": "高股息ETF",
+  // 市值型 / 科技 ETF
+  "0050": "市值型ETF", "0052": "科技型ETF", "006208": "市值型ETF", "00881": "科技型ETF", "00935": "科技型ETF"
+};
+
+const SECTOR_COLORS = {
+  "半導體": "#3b82f6",     // 藍色
+  "AI代工": "#a855f7",     // 紫色
+  "散熱綠能": "#10b981",   // 翠綠
+  "金融金控": "#f59e0b",   // 金黃
+  "航運傳產": "#06b6d4",   // 青藍
+  "高股息ETF": "#ef4444",  // 鮮紅
+  "市值型ETF": "#ec4899",  // 粉紅
+  "科技型ETF": "#8b5cf6",  // 靛紫
+  "其他成長股": "#64748b"  // 灰藍
+};
+
+function getStockSector(code, name = "") {
+  const c = String(code).trim();
+  if (SECTOR_MAP[c]) return SECTOR_MAP[c];
+  if (name.includes("高股息") || name.includes("高息")) return "高股息ETF";
+  if (name.includes("ETF") || name.includes("00")) return "市值型ETF";
+  if (name.includes("金控") || name.includes("銀") || name.includes("壽")) return "金融金控";
+  if (name.includes("電") || name.includes("晶") || name.includes("科")) return "半導體";
+  if (name.includes("航") || name.includes("海") || name.includes("運")) return "航運傳產";
+  return "其他成長股";
+}
+
 // Rich default watchlist of 12 top Taiwan stocks
 const DEFAULT_WATCHLIST = [
   { code: "2454", name: "聯發科", note: "IC設計龍頭" },
@@ -206,6 +260,16 @@ function setupEventListeners() {
       }
     });
   });
+
+  // Cash Reserve Input Listener for Asset Risk Allocation
+  const cashInput = document.getElementById("inputCashReserve");
+  if (cashInput) {
+    cashInput.addEventListener("input", () => {
+      if (window._currentHoldings && window._currentTotalVal) {
+        renderSectorRiskDashboard(window._currentHoldings, window._currentTotalVal);
+      }
+    });
+  }
 
 
   // Sheet Config Modal controls
@@ -582,10 +646,170 @@ function renderActiveTabContent() {
 
     tbody.appendChild(tr);
   });
+
+  // Store references for live cash input updates
+  window._currentHoldings = holdings;
+  window._currentTotalVal = totalVal;
+
+  // Render Sector Exposure & Asset Risk Management Dashboard
+  renderSectorRiskDashboard(holdings, totalVal);
+}
+
+// Render Sector Exposure & Asset Risk Management Dashboard
+function renderSectorRiskDashboard(holdings, totalVal) {
+  const section = document.getElementById("sectorRiskSection");
+  if (!section) return;
+
+  if (!holdings || holdings.length === 0 || totalVal <= 0) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "block";
+
+  // Account tag
+  const tagEl = document.getElementById("riskAccountTag");
+  if (tagEl) {
+    tagEl.textContent = (currentTab === "all") ? "全部合併總覽" : `【${currentTab}】帳戶`;
+  }
+
+  // Calculate sector weights
+  const sectorTotals = {};
+  holdings.forEach(h => {
+    const sector = getStockSector(h.code, h.name);
+    const mVal = (h.current_price || h.cost_price || 0) * (h.shares || 0);
+    sectorTotals[sector] = (sectorTotals[sector] || 0) + mVal;
+  });
+
+  const sectorList = Object.keys(sectorTotals)
+    .map(s => ({
+      name: s,
+      val: sectorTotals[s],
+      pct: totalVal > 0 ? (sectorTotals[s] / totalVal) * 100 : 0,
+      color: SECTOR_COLORS[s] || "#64748b"
+    }))
+    .sort((a, b) => b.val - a.val);
+
+  // Center Value
+  const centerValEl = document.getElementById("riskCenterValue");
+  if (centerValEl) {
+    centerValEl.textContent = `NT$ ${Math.round(totalVal / 10000)}萬`;
+  }
+
+  // Draw Doughnut Chart
+  const canvas = document.getElementById("sectorDoughnutCanvas");
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    if (sectorDoughnutChart) {
+      sectorDoughnutChart.destroy();
+    }
+    sectorDoughnutChart = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: sectorList.map(s => s.name),
+        datasets: [{
+          data: sectorList.map(s => s.val),
+          backgroundColor: sectorList.map(s => s.color),
+          borderWidth: 2,
+          borderColor: "#0f172a",
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "70%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const item = sectorList[ctx.dataIndex];
+                return ` ${item.name}: NT$ ${Math.round(item.val).toLocaleString()} 元 (${item.pct.toFixed(1)}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Render Bars List
+  const barsContainer = document.getElementById("sectorBarsList");
+  if (barsContainer) {
+    barsContainer.innerHTML = sectorList.map(s => `
+      <div class="sector-bar-row">
+        <div class="sector-bar-meta">
+          <div class="sector-name-box">
+            <span class="sector-color-dot" style="background: ${s.color};"></span>
+            <span>${s.name}</span>
+          </div>
+          <div class="sector-val-box">
+            <b>${s.pct.toFixed(1)}%</b> · NT$ ${Math.round(s.val).toLocaleString()}
+          </div>
+        </div>
+        <div class="sector-progress-track">
+          <div class="sector-progress-fill" style="width: ${Math.min(100, s.pct)}%; background: ${s.color};"></div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // Update Cash Reserve and Risk Advice
+  updateCashReserveAndRiskAdvice(totalVal, sectorList);
+}
+
+function updateCashReserveAndRiskAdvice(totalVal, sectorList) {
+  const cashInput = document.getElementById("inputCashReserve");
+  const cashValTenThousand = parseFloat(cashInput ? cashInput.value : 50) || 0;
+  const cashTotal = cashValTenThousand * 10000;
+  const grandTotal = totalVal + cashTotal;
+
+  const stockPct = grandTotal > 0 ? Math.round((totalVal / grandTotal) * 100) : 100;
+  const cashPct = 100 - stockPct;
+
+  const pill = document.getElementById("cashRatioPill");
+  if (pill) {
+    pill.textContent = `股票 ${stockPct}% : 現金 ${cashPct}%`;
+  }
+
+  // Risk health check
+  const maxSector = sectorList && sectorList.length > 0 ? sectorList[0] : null;
+  const healthBadge = document.getElementById("riskHealthBadge");
+  const healthText = document.getElementById("riskHealthText");
+  const healthIcon = document.getElementById("riskHealthIcon");
+  const diagMsg = document.getElementById("riskDiagMessage");
+
+  if (maxSector && maxSector.pct >= 45.0) {
+    if (healthBadge) healthBadge.className = "risk-health-badge health-warning";
+    if (healthIcon) healthIcon.textContent = "⚠️";
+    if (healthText) healthText.textContent = "族群集中度過高";
+    if (diagMsg) {
+      diagMsg.innerHTML = `⚠️ <b>【族群過度集中警示】</b>目前 <b>${maxSector.name}</b> 族群佔比達 <b>${maxSector.pct.toFixed(1)}%</b>，資金高度偏重單一族群。若遇族群性系統修正回檔波動較劇烈，建議適度將獲利配置至防守型資產或高股息 ETF。`;
+    }
+  } else if (stockPct >= 90) {
+    if (healthBadge) healthBadge.className = "risk-health-badge health-warning";
+    if (healthIcon) healthIcon.textContent = "⚠️";
+    if (healthText) healthText.textContent = "滿倉現金偏低";
+    if (diagMsg) {
+      diagMsg.innerHTML = `⚠️ <b>【高水位風控提醒】</b>整體股票部位已達 <b>${stockPct}%</b>，手邊備用現金僅佔 <b>${cashPct}%</b>。建議維持至少 15%~20% 現金儲備，以因應大盤系統性波動。`;
+    }
+  } else {
+    if (healthBadge) healthBadge.className = "risk-health-badge health-good";
+    if (healthIcon) healthIcon.textContent = "🛡️";
+    if (healthText) healthText.textContent = "族群配置健康";
+    if (diagMsg) {
+      const topName = maxSector ? maxSector.name : "核心持股";
+      const topPct = maxSector ? maxSector.pct.toFixed(1) : "0";
+      diagMsg.innerHTML = `🛡️ <b>【資產防守體質優異】</b>最大產業（${topName} ${topPct}%）未超過 45% 警戒線，持股分佈均衡且保有 <b>${cashPct}%</b> 彈性現金，兼具獲利攻擊力與下檔抗震韌性！`;
+    }
+  }
 }
 
 // Watchlist View Handler
 async function renderWatchlistView() {
+  const sectorSection = document.getElementById("sectorRiskSection");
+  if (sectorSection) sectorSection.style.display = "none";
+
   document.getElementById("thOwner").style.display = "none";
   document.getElementById("tableSectionTitle").textContent = "🎯 未持股買點雷達（進場時機與損益比把關）";
   document.getElementById("tableCountBadge").textContent = `觀察中 ${watchlistStocks.length} 檔`;
@@ -788,8 +1012,16 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
   // Draw Chart
   drawCandleChart(stock.candles, stock.support, stock.resistance, stock.timeframe);
   if (shouldOpenModal) {
-    setTimeout(() => { if (chartInstance) chartInstance.resize(); }, 100);
-    setTimeout(() => { if (chartInstance) chartInstance.resize(); }, 300);
+    setTimeout(() => {
+      const container = document.getElementById("tvChartContainer");
+      if (tvChart && container) {
+        tvChart.applyOptions({
+          width: container.clientWidth,
+          height: container.clientHeight || 560
+        });
+        tvChart.timeScale().fitContent();
+      }
+    }, 150);
   }
 }
 
@@ -906,120 +1138,230 @@ async function loadStockDetail(code, holdingContext = null, shouldOpenModal = tr
   }
 }
 
-// Draw Professional Candlestick & Moving Averages Chart
-function drawCandleChart(candles, support, resistance, timeframe = "D") {
-  const canvas = document.getElementById("klineCanvas");
-  const ctx = canvas.getContext("2d");
+// Update live OHLC crosshair bar
+function updateOhlcBar(candle, volData) {
+  if (!candle) return;
+  const openEl = document.getElementById("tvOpen");
+  const highEl = document.getElementById("tvHigh");
+  const lowEl = document.getElementById("tvLow");
+  const closeEl = document.getElementById("tvClose");
+  const changeEl = document.getElementById("tvChange");
+  const volEl = document.getElementById("tvVol");
 
-  if (chartInstance) {
-    chartInstance.destroy();
+  if (openEl) openEl.textContent = (candle.open != null) ? candle.open.toFixed(2) : "--";
+  if (highEl) highEl.textContent = (candle.high != null) ? candle.high.toFixed(2) : "--";
+  if (lowEl) lowEl.textContent = (candle.low != null) ? candle.low.toFixed(2) : "--";
+  if (closeEl) {
+    closeEl.textContent = (candle.close != null) ? candle.close.toFixed(2) : "--";
+    const isUp = (candle.close >= candle.open);
+    closeEl.style.color = isUp ? "#ef4444" : "#22c55e";
   }
+  if (changeEl && candle.open != null && candle.close != null) {
+    const diff = candle.close - candle.open;
+    const pct = candle.open > 0 ? (diff / candle.open) * 100 : 0;
+    changeEl.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)} (${diff >= 0 ? '+' : ''}${pct.toFixed(2)}%)`;
+    changeEl.style.color = diff >= 0 ? "#ef4444" : "#22c55e";
+  }
+  if (volEl) {
+    const v = (volData && volData.value != null) ? volData.value : (candle.volume || 0);
+    volEl.textContent = `${Math.round(v).toLocaleString()} 張`;
+  }
+}
+
+// Draw Professional TradingView Candlestick & Volume Histogram Chart
+function drawCandleChart(candles, support, resistance, timeframe = "D") {
+  const container = document.getElementById("tvChartContainer");
+  if (!container) return;
 
   const isW = (timeframe === "W");
-  const ma5Label = isW ? "5週線" : "5MA (週線)";
-  const ma20Label = isW ? "20週線 (季線生命線)" : "20MA (月線生命線)";
-  const ma60Label = isW ? "60週線 (年線)" : "60MA (季線)";
+  const tfTag = document.getElementById("tvTfTag");
+  if (tfTag) tfTag.textContent = isW ? "週K" : "日K";
 
-  const labels = candles.map(c => c.date);
-  const closePrices = candles.map(c => c.close);
-  const ma5 = candles.map(c => c.ma5);
-  const ma20 = candles.map(c => c.ma20);
-  const ma60 = candles.map(c => c.ma60);
+  // Clean old instance
+  if (tvChart) {
+    try {
+      tvChart.remove();
+    } catch (e) {}
+    tvChart = null;
+  }
+  container.innerHTML = "";
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-  gradient.addColorStop(0, "rgba(59, 130, 246, 0.35)");
-  gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
+  if (!window.LightweightCharts) {
+    console.error("TradingView LightweightCharts library not loaded, falling back");
+    return;
+  }
 
-  chartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: isW ? "週收盤價" : "日收盤價",
-          data: closePrices,
-          borderColor: "#3b82f6",
-          borderWidth: 2.5,
-          backgroundColor: gradient,
-          fill: true,
-          tension: 0.15,
-          pointRadius: isW ? 2 : 0,
-          pointHoverRadius: 6,
-          pointHoverBackgroundColor: "#60a5fa"
-        },
-        {
-          label: ma5Label,
-          data: ma5,
-          borderColor: "#f59e0b",
-          borderWidth: 1.5,
-          pointRadius: 0,
-          fill: false,
-          tension: 0.1
-        },
-        {
-          label: ma20Label,
-          data: ma20,
-          borderColor: "#10b981",
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false,
-          tension: 0.1
-        },
-        {
-          label: ma60Label,
-          data: ma60,
-          borderColor: "#a855f7",
-          borderWidth: 1.5,
-          pointRadius: 0,
-          fill: false,
-          tension: 0.1
-        }
-      ]
+  // Create TradingView Chart
+  const width = container.clientWidth || 800;
+  const height = container.clientHeight || 560;
+
+  tvChart = window.LightweightCharts.createChart(container, {
+    width: width,
+    height: height,
+    layout: {
+      background: { type: "solid", color: "#090d16" },
+      textColor: "#94a3b8",
+      fontSize: 12,
+      fontFamily: "JetBrains Mono, -apple-system, BlinkMacSystemFont, sans-serif"
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: "index",
-        intersect: false
+    grid: {
+      vertLines: { color: "rgba(255, 255, 255, 0.04)" },
+      horzLines: { color: "rgba(255, 255, 255, 0.04)" }
+    },
+    crosshair: {
+      mode: window.LightweightCharts.CrosshairMode.Normal,
+      vertLine: {
+        color: "rgba(59, 130, 246, 0.4)",
+        width: 1,
+        style: 3,
+        labelBackgroundColor: "#1e3a8a"
       },
-      plugins: {
-        legend: {
-          position: "top",
-          labels: {
-            color: "#94a3b8",
-            font: { size: 12, family: "Plus Jakarta Sans" },
-            boxWidth: 14,
-            boxHeight: 14
-          }
-        },
-        tooltip: {
-          backgroundColor: "#0f172a",
-          titleColor: "#f8fafc",
-          bodyColor: "#cbd5e1",
-          borderColor: "rgba(255, 255, 255, 0.15)",
-          borderWidth: 1,
-          padding: 12,
-          bodyFont: { family: "JetBrains Mono", size: 13 }
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: "rgba(255, 255, 255, 0.04)" },
-          ticks: {
-            color: "#64748b",
-            maxTicksLimit: 14,
-            font: { family: "JetBrains Mono", size: 11 }
-          }
-        },
-        y: {
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
-          ticks: {
-            color: "#94a3b8",
-            font: { family: "JetBrains Mono", size: 12 }
-          }
-        }
+      horzLine: {
+        color: "rgba(59, 130, 246, 0.4)",
+        width: 1,
+        style: 3,
+        labelBackgroundColor: "#1e3a8a"
       }
+    },
+    rightPriceScale: {
+      borderColor: "rgba(255, 255, 255, 0.1)",
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.25
+      }
+    },
+    timeScale: {
+      borderColor: "rgba(255, 255, 255, 0.1)",
+      timeVisible: true,
+      secondsVisible: false
     }
   });
+
+  // 1. Volume Series (Histogram at bottom)
+  tvVolumeSeries = tvChart.addHistogramSeries({
+    color: "#26a69a",
+    priceFormat: {
+      type: "volume"
+    },
+    priceScaleId: "",
+    scaleMargins: {
+      top: 0.78,
+      bottom: 0
+    }
+  });
+
+  const volData = candles.map(c => ({
+    time: c.date,
+    value: c.volume || 0,
+    color: (c.close >= c.open) ? "rgba(239, 68, 68, 0.55)" : "rgba(34, 197, 94, 0.55)"
+  }));
+  tvVolumeSeries.setData(volData);
+
+  // 2. Candlestick Series (Taiwan Red for Gain, Green for Loss)
+  tvCandleSeries = tvChart.addCandlestickSeries({
+    upColor: "#ef4444",
+    downColor: "#22c55e",
+    borderUpColor: "#ef4444",
+    borderDownColor: "#22c55e",
+    wickUpColor: "#ef4444",
+    wickDownColor: "#22c55e"
+  });
+
+  const candleData = candles.map(c => ({
+    time: c.date,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close
+  }));
+  tvCandleSeries.setData(candleData);
+
+  // 3. Moving Averages (MA5, MA20, MA60)
+  tvMa5Series = tvChart.addLineSeries({
+    color: "#f59e0b",
+    lineWidth: 1.5,
+    title: isW ? "5週線" : "5MA",
+    priceLineVisible: false
+  });
+  const ma5Data = candles.filter(c => c.ma5 != null).map(c => ({ time: c.date, value: c.ma5 }));
+  tvMa5Series.setData(ma5Data);
+
+  tvMa20Series = tvChart.addLineSeries({
+    color: "#3b82f6",
+    lineWidth: 2,
+    title: isW ? "20週線" : "20MA",
+    priceLineVisible: false
+  });
+  const ma20Data = candles.filter(c => c.ma20 != null).map(c => ({ time: c.date, value: c.ma20 }));
+  tvMa20Series.setData(ma20Data);
+
+  tvMa60Series = tvChart.addLineSeries({
+    color: "#a855f7",
+    lineWidth: 1.5,
+    title: isW ? "60週線" : "60MA",
+    priceLineVisible: false
+  });
+  const ma60Data = candles.filter(c => c.ma60 != null).map(c => ({ time: c.date, value: c.ma60 }));
+  tvMa60Series.setData(ma60Data);
+
+  // 4. Support and Resistance Lines
+  if (support > 0) {
+    tvCandleSeries.createPriceLine({
+      price: support,
+      color: "#22c55e",
+      lineWidth: 1.5,
+      lineStyle: window.LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "關鍵支撐"
+    });
+  }
+
+  if (resistance > 0) {
+    tvCandleSeries.createPriceLine({
+      price: resistance,
+      color: "#ef4444",
+      lineWidth: 1.5,
+      lineStyle: window.LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "短線壓力"
+    });
+  }
+
+  // Update initial OHLC bar with the latest candle
+  if (candles.length > 0) {
+    const lastCandle = candles[candles.length - 1];
+    updateOhlcBar(lastCandle, { value: lastCandle.volume });
+  }
+
+  // Crosshair move subscription for live OHLC values
+  tvChart.subscribeCrosshairMove(param => {
+    if (!param || !param.time) {
+      if (candles.length > 0) {
+        const lastCandle = candles[candles.length - 1];
+        updateOhlcBar(lastCandle, { value: lastCandle.volume });
+      }
+      return;
+    }
+    const cData = param.seriesData.get(tvCandleSeries);
+    const vData = param.seriesData.get(tvVolumeSeries);
+    if (cData) {
+      updateOhlcBar(cData, vData);
+    }
+  });
+
+  // Fit content
+  tvChart.timeScale().fitContent();
+
+  // Resize handler
+  const resizeHandler = () => {
+    if (tvChart && container) {
+      tvChart.applyOptions({
+        width: container.clientWidth,
+        height: container.clientHeight || 560
+      });
+    }
+  };
+  window.removeEventListener("resize", window._tvChartResizeHandler);
+  window._tvChartResizeHandler = resizeHandler;
+  window.addEventListener("resize", resizeHandler);
 }
