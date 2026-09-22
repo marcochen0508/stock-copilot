@@ -36,6 +36,12 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background-color: var(--bg-main);
   color: var(--text-main);
@@ -44,6 +50,8 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 /* Header */
@@ -824,11 +832,13 @@ body {
   gap: 32px;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
 .table-section-card {
   width: 100%;
+  min-width: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -837,8 +847,28 @@ body {
   scroll-margin-top: 90px;
 }
 
+.mobile-table-hint {
+  display: none;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px dashed rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  animation: pulseHint 2.5s infinite;
+}
+
+@keyframes pulseHint {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; border-color: #38bdf8; }
+}
+
 .chart-section-card {
   width: 100%;
+  min-width: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -1797,3 +1827,570 @@ body {
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* ==========================================================================
+   📱 響應式佈局與行動端極致體驗 (Mobile & Tablet Responsive System)
+   ========================================================================== */
+
+/* 平板裝置 (Tablets & Medium Screens <= 1024px) */
+@media (max-width: 1024px) {
+  .app-header {
+    padding: 16px 20px;
+  }
+
+  .macro-section {
+    padding: 20px 20px;
+  }
+
+  .main-container {
+    padding: 20px 20px 48px;
+  }
+
+  .macro-cards-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .summary-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-card.dividend-highlight {
+    grid-column: 1 / -1;
+  }
+
+  .sector-risk-body {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .sector-chart-wrapper {
+    margin: 0 auto;
+  }
+}
+
+/* 手機直式與大螢幕手機 (Smartphones <= 768px) */
+@media (max-width: 768px) {
+  /* 基礎版面防溢位與邊距縮減 */
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  /* 頂部導航列 */
+  .app-header {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .header-left {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .header-left .brand-logo {
+    gap: 10px;
+  }
+
+  .logo-icon {
+    font-size: 26px;
+  }
+
+  .brand-title {
+    font-size: 18px;
+    letter-spacing: -0.3px;
+  }
+
+  .brand-subtitle {
+    display: none; /* 手機端隱藏副標題，避免佔據 3 行空間 */
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .sync-status {
+    padding: 5px 10px;
+    font-size: 12px;
+    border-radius: 16px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 12.5px;
+    border-radius: 8px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* 美股宏觀先行看板 */
+  .macro-section {
+    padding: 16px 12px;
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  .macro-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    gap: 8px;
+  }
+
+  .section-title .icon {
+    font-size: 20px;
+  }
+
+  .section-title h2 {
+    font-size: 16px;
+  }
+
+  .macro-badge-wrap {
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .bias-badge {
+    padding: 4px 12px;
+    font-size: 13px;
+    border-radius: 16px;
+  }
+
+  /* 美股卡片 2 欄排列 */
+  .macro-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+    width: 100%;
+  }
+
+  .macro-card {
+    padding: 10px 12px;
+  }
+
+  .macro-card-title {
+    font-size: 11.5px;
+    margin-bottom: 4px;
+  }
+
+  .macro-card-price {
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+
+  .macro-card-change {
+    font-size: 12.5px;
+  }
+
+  /* 💡 今日宏觀點評（修復文字被擠壓成單字直列的問題） */
+  .morning-briefing-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .briefing-tag {
+    align-self: flex-start;
+    padding: 3px 10px;
+    font-size: 12.5px;
+    margin-bottom: 2px;
+  }
+
+  .briefing-text {
+    width: 100%;
+    font-size: 13.5px;
+    line-height: 1.6;
+    word-break: break-word;
+    color: #f1f5f9;
+  }
+
+  /* 主工作區容器 */
+  .main-container {
+    padding: 14px 10px 48px;
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  /* 戶頭切換區 (修復輸入框爆出與按鈕重疊問題) */
+  .account-selector-card {
+    padding: 14px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 18px;
+  }
+
+  .account-selector-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .selector-title {
+    gap: 8px;
+  }
+
+  .selector-title .icon {
+    font-size: 18px;
+  }
+
+  .selector-title h3 {
+    font-size: 15px;
+  }
+
+  .account-quick-dropdown {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .account-quick-dropdown label {
+    font-size: 13px;
+    white-space: nowrap;
+    color: #94a3b8;
+  }
+
+  .account-select-input {
+    flex: 1;
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .portfolio-tabs-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .tabs-list {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    gap: 8px;
+    scrollbar-width: none;
+  }
+
+  .tabs-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    padding: 8px 14px;
+    font-size: 13.5px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .tab-btn .tab-icon {
+    font-size: 16px;
+  }
+
+  .search-bar-wrap {
+    width: 100%;
+  }
+
+  .search-bar-wrap .search-box {
+    width: 100% !important;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px 6px 12px;
+  }
+
+  .search-box input {
+    min-width: 0;
+    flex: 1;
+    font-size: 14px;
+  }
+
+  .btn-search {
+    padding: 6px 12px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .current-account-banner {
+    padding: 8px 10px;
+    font-size: 12.5px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .banner-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+
+  /* 總結卡片網格 (2 欄乾淨排版) */
+  .summary-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .summary-card {
+    padding: 12px 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .card-label {
+    font-size: 11.5px;
+    margin-bottom: 4px;
+  }
+
+  .card-value {
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+
+  .card-sub {
+    font-size: 11px;
+  }
+
+  .summary-card.dividend-highlight {
+    grid-column: 1 / -1;
+  }
+
+  /* 族群曝險與風控儀表板 */
+  .sector-risk-card {
+    padding: 14px 12px;
+    margin-bottom: 18px;
+  }
+
+  .sector-risk-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .risk-header-title h3 {
+    font-size: 15px;
+  }
+
+  .sector-risk-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .chart-canvas-box {
+    width: 150px;
+    height: 150px;
+  }
+
+  .sector-bars-container {
+    max-height: 220px;
+  }
+
+  .sector-advice-box {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+  }
+
+  .cash-watermark-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* 表格區塊與滑動提示 */
+  .table-section-card {
+    padding: 14px 10px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .card-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .card-section-header h3 {
+    font-size: 16px;
+  }
+
+  .mobile-table-hint {
+    display: block; /* 手機端展示左右滑動指引 */
+  }
+
+  .table-responsive {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    display: block;
+  }
+
+  .stock-table th, .stock-table td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .stock-code-cell .code {
+    font-size: 15px;
+  }
+
+  .stock-code-cell .name {
+    font-size: 12px;
+  }
+
+  .stock-num {
+    font-size: 14px;
+  }
+
+  .action-badge {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .btn-chart-view {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* 觀察清單工具列 */
+  .watchlist-manager-toolbar {
+    padding: 12px 10px;
+  }
+
+  .add-stock-box {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .add-stock-box input {
+    width: 100% !important;
+    box-sizing: border-box;
+    font-size: 14px;
+  }
+
+  .add-stock-box .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .quick-tags {
+    gap: 6px;
+  }
+
+  .tag-pill {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* 走勢圖與法人診斷彈窗 (全螢幕行動體驗) */
+  .modal-stock-overlay {
+    padding: 0 !important;
+  }
+
+  .modal-stock-window {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+
+  .modal-stock-header {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-stock-header h2 {
+    font-size: 18px;
+  }
+
+  .stock-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .modal-stock-body {
+    padding: 12px 10px;
+  }
+
+  .tv-ohlc-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 11.5px;
+  }
+
+  .tv-ohlc-items {
+    gap: 6px;
+    font-size: 11.5px;
+    flex-wrap: wrap;
+  }
+
+  .tv-hint {
+    display: none;
+  }
+
+  .chart-canvas-container {
+    height: 380px !important;
+  }
+
+  .institutional-banner-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .chip-streak-pills {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .modal-window {
+    width: 95%;
+    max-width: 95%;
+  }
+}
+
+/* 超窄手機 (<= 380px) */
+@media (max-width: 380px) {
+  .macro-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
