@@ -29,6 +29,16 @@
 
 ---
 
+## ☁️ 雲端正式部署資訊
+
+- **正式上線網址**：[https://stock-copilot-lqiw.onrender.com](https://stock-copilot-lqiw.onrender.com)
+- **雲端託管平台**：Render (Web Service - Free Plan)
+- **管理登入帳號**：Gmail `marcochen0006@gmail.com`
+- **GitHub 專案倉庫**：[https://github.com/marcochen0508/stock-copilot](https://github.com/marcochen0508/stock-copilot)
+- **持續整合部署 (CI/CD)**：本地代碼推送至 `main` 分支後，Render 將自動觸發建置並無縫更新上線。
+
+---
+
 ## 📋 未來演進路線與待辦事項
 
 系統未來的演進規劃（籌碼面三大法人分析、LINE/Telegram 盤中主動警示推播、資產配置圓餅圖、TradingView 蠟燭圖等）已詳細收錄在 [`TODO.md`](file:///c:/Users/marcochen/Downloads/個人/股市協助工具/TODO.md)。
