@@ -794,37 +794,12 @@ async function loadPortfolioData(forceSync = false) {
     syncStatus.textContent = `🟢 已連線${isCustom ? '個人' : ''}試算表 (更新: ${data.synced_at.split(' ')[1]})`;
     renderPersonTabs();
     renderActiveTabContent();
-    preloadHoldingsCharts(data);
   } catch (err) {
     syncStatus.textContent = "試算表連線失敗";
     console.error("Error loading portfolios:", err);
   } finally {
     btnSync.classList.remove("loading");
   }
-}
-
-// Background preload top holdings' charts so that clicking them opens with 0ms delay
-function preloadHoldingsCharts(portfolioData) {
-  if (!portfolioData || !portfolioData.aggregate || !portfolioData.aggregate.holdings) return;
-  const holdings = portfolioData.aggregate.holdings.slice(0, 10);
-  let delay = 1200;
-  holdings.forEach(h => {
-    const code = String(h.code).trim().toUpperCase();
-    setTimeout(() => {
-      const cacheKey = `${code}_D`;
-      if (!stockDetailClientCache.has(cacheKey)) {
-        fetch(`/api/stock/${code}?tf=D`)
-          .then(res => res.ok ? res.json() : null)
-          .then(res => {
-            if (res && res.stock) {
-              stockDetailClientCache.set(cacheKey, { data: res, timestamp: Date.now() });
-            }
-          })
-          .catch(() => {});
-      }
-    }, delay);
-    delay += 900;
-  });
 }
 
 // Render dynamic tabs: [全部總覽], [阿良], [甘露涓], [景維], [阿輝], [未持股觀察名單]
@@ -1552,6 +1527,13 @@ async function loadStockDetail(code, holdingContext = null, shouldOpenModal = tr
   activeStockCode = cleanCode;
   activeHoldingContext = holdingContext;
 
+  // Immediately update header title to provide visual feedback
+  const titleEl = document.getElementById("chartStockTitle");
+  if (titleEl) {
+    const stockName = (holdingContext && holdingContext.name) ? holdingContext.name : "";
+    titleEl.textContent = `${cleanCode} ${stockName}`;
+  }
+
   // Update timeframe buttons active state immediately
   const tfBtns = document.querySelectorAll(".timeframe-selector .tf-btn");
   tfBtns.forEach(b => {
@@ -1581,13 +1563,8 @@ async function loadStockDetail(code, holdingContext = null, shouldOpenModal = tr
   // 2. SLOW PATH: Show immediate loading feedback & fetch from server
   if (overlay) {
     if (loaderText) {
-      if (currentStockTimeframe === "M") {
-        loaderText.textContent = "正在載入月K走勢中...";
-      } else if (currentStockTimeframe === "W") {
-        loaderText.textContent = "正在載入週K走勢中...";
-      } else {
-        loaderText.textContent = "正在載入日K走勢中...";
-      }
+      const tfName = (currentStockTimeframe === "M") ? "月K" : ((currentStockTimeframe === "W") ? "週K" : "日K");
+      loaderText.textContent = `正在連線載入 ${cleanCode} ${tfName}走勢與量化指標...`;
     }
     overlay.classList.add("active");
   }
