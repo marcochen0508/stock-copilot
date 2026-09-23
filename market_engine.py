@@ -434,7 +434,120 @@ def get_institutional_data(code: str) -> Dict[str, Any]:
 # In-memory caches to accelerate subsequent queries and timeframe switching
 STOCK_EXCHANGE_MAP: Dict[str, str] = {}
 STOCK_DIVIDEND_CACHE: Dict[str, float] = {}
+STOCK_FUNDAMENTAL_CACHE: Dict[str, Dict[str, Any]] = {}
 TWSE_REALTIME_CACHE: Dict[str, Dict[str, Any]] = {}
+
+def get_stock_valuation_and_targets(target_sym: str, clean_code: str, cur_price: float, df: pd.DataFrame, ma20: float, ma60: float, support: float, resistance: float) -> Dict[str, Any]:
+    """
+    Institutional 3-tier quantitative valuation model (Fundamental EPS x PE Bands + Technical Fibonacci Targets).
+    """
+    now_ts = datetime.datetime.now().timestamp()
+    cached = STOCK_FUNDAMENTAL_CACHE.get(clean_code)
+    if cached and (now_ts - cached.get("time", 0)) < 3600:
+        fund_info = cached.get("info", {})
+    else:
+        fund_info = {}
+        try:
+            t_obj = yf.Ticker(target_sym)
+            fund_info = t_obj.info or {}
+        except Exception as ex:
+            logger.warning(f"Could not fetch yfinance fundamental info for {target_sym}: {ex}")
+        STOCK_FUNDAMENTAL_CACHE[clean_code] = {"info": fund_info, "time": now_ts}
+    
+    quote_type = fund_info.get("quoteType", "")
+    is_etf = (quote_type == "ETF") or clean_code.startswith("00")
+    
+    eps = fund_info.get("forwardEps") or fund_info.get("trailingEps") or 0.0
+    trailing_pe = fund_info.get("trailingPE") or 0.0
+    forward_pe = fund_info.get("forwardPE") or 0.0
+    book_value = fund_info.get("bookValue") or 0.0
+    shares = fund_info.get("sharesOutstanding") or 0
+    market_cap = fund_info.get("marketCap") or (cur_price * shares if shares > 0 else 0)
+    
+    # Format Market Cap text
+    if market_cap >= 1_000_000_000_000:
+        market_cap_text = f"{market_cap / 1_000_000_000_000:.2f} 兆元"
+    elif market_cap >= 100_000_000:
+        market_cap_text = f"{market_cap / 100_000_000:.1f} 億元"
+    else:
+        market_cap_text = "--"
+
+    # Technical swing high & low (past 60 bars)
+    sub_df = df.iloc[-min(60, len(df)):] if len(df) > 0 else df
+    swing_low = round(float(sub_df["Low"].min()), 1) if not sub_df.empty else support
+    swing_high = round(float(sub_df["High"].max()), 1) if not sub_df.empty else resistance
+    amplitude = max(1.0, swing_high - swing_low)
+    
+    # Fibonacci Expansion Targets (波段滿足點)
+    fibo_target_1 = round(swing_high + (amplitude * 0.618), 1)
+    fibo_target_2 = round(swing_high + (amplitude * 1.0), 1)
+    fibo_target_3 = round(swing_high + (amplitude * 1.618), 1)
+
+    if not is_etf and eps > 0:
+        base_pe = trailing_pe if trailing_pe > 0 else (cur_price / eps if eps > 0 else 16.0)
+        pe_low = round(max(10.0, min(14.0, base_pe * 0.8)), 1)
+        pe_mid = round(max(14.0, min(18.5, base_pe * 1.0)), 1)
+        pe_high = round(max(18.5, min(24.0, base_pe * 1.25)), 1)
+        
+        val_low = round(eps * pe_low, 1)
+        val_mid = round(eps * pe_mid, 1)
+        val_high = round(eps * pe_high, 1)
+    else:
+        val_low = round(min(support, ma60 * 0.96 if ma60 > 0 else cur_price * 0.92), 1)
+        val_mid = round(ma20 if ma20 > 0 else cur_price, 1)
+        val_high = round(max(resistance, swing_high * 1.06), 1)
+        pe_low, pe_mid, pe_high = 0.0, 0.0, 0.0
+
+    if val_low > val_mid:
+        val_low = round(val_mid * 0.88, 1)
+    if val_high < val_mid:
+        val_high = round(val_mid * 1.15, 1)
+
+    if cur_price <= val_low:
+        val_status = "🟢 價值低估區（具備極佳安全防守邊際）"
+        val_badge = "低估防守"
+        val_color = "#10b981"
+        val_advice = f"目前股價 ({cur_price}元) 低於保守估值 ({val_low}元)，下檔風險相對有限，具備優異投資價值。"
+    elif cur_price <= val_mid:
+        val_status = "🔵 合理偏低區（多頭健康成長區間）"
+        val_badge = "合理偏低"
+        val_color = "#3b82f6"
+        val_advice = f"股價落在合理中軸以下 ({val_low} ~ {val_mid}元)，基本面支撐力道良好，適合分批布局或續抱。"
+    elif cur_price <= val_high:
+        val_status = "🟡 合理偏高區（波段持有，切勿盲目追高）"
+        val_badge = "合理偏高"
+        val_color = "#f59e0b"
+        val_advice = f"股價已接近波段樂觀天花板 ({val_high}元)，潛在報酬空間縮減，建議設定移動停利點，切勿重壓追高。"
+    else:
+        val_status = "🔴 昂貴超買區（已過度透支未來成長）"
+        val_badge = "昂貴超買"
+        val_color = "#ef4444"
+        val_advice = f"股價已突破波段樂觀估值 ({val_high}元)，風險顯著大於利潤，提防主力大戶拉高出貨，宜分批獲利入袋。"
+
+    return {
+        "is_etf": is_etf,
+        "eps": round(float(eps), 2) if eps else 0.0,
+        "pe": round(float(trailing_pe), 1) if trailing_pe else (round(float(cur_price / eps), 1) if eps > 0 else 0.0),
+        "forward_pe": round(float(forward_pe), 1) if forward_pe else 0.0,
+        "book_value": round(float(book_value), 2) if book_value else 0.0,
+        "shares": shares,
+        "market_cap_text": market_cap_text,
+        "val_low": val_low,
+        "val_mid": val_mid,
+        "val_high": val_high,
+        "val_status": val_status,
+        "val_badge": val_badge,
+        "val_color": val_color,
+        "val_advice": val_advice,
+        "pe_low": pe_low,
+        "pe_mid": pe_mid,
+        "pe_high": pe_high,
+        "swing_low": swing_low,
+        "swing_high": swing_high,
+        "fibo_target_1": fibo_target_1,
+        "fibo_target_2": fibo_target_2,
+        "fibo_target_3": fibo_target_3
+    }
 
 def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: str = "1d") -> Optional[Dict[str, Any]]:
     """
@@ -644,7 +757,8 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
         "annual_dividend": annual_dividend,
         "dividend_yield": dividend_yield,
         "candles": candles,
-        "institutional": inst_data
+        "institutional": inst_data,
+        "valuation": get_stock_valuation_and_targets(target_sym, clean_code, cur_price, df, ma20, ma60, support, resistance)
     }
 
 def diagnose_stock_holding(stock_info: Dict[str, Any], cost_price: float, shares: int = 1000) -> Dict[str, Any]:

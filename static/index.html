@@ -420,6 +420,121 @@
           </div>
         </div>
 
+        <!-- Institutional 3-Tier Valuation & Science Targets Module -->
+        <div class="valuation-target-card" id="valuationTargetCard">
+          <div class="val-header">
+            <div class="val-header-left">
+              <span class="val-icon">🎯</span>
+              <div class="val-title-group">
+                <span class="val-title">法人級科學目標價預估 ＆ 估值戰情</span>
+                <span class="val-subtitle">拒絕群組憑空喊價 · EPS合理本益比 × 波段黃金分割測幅</span>
+              </div>
+            </div>
+            <span class="val-status-badge" id="valStatusBadge">合理偏低</span>
+          </div>
+
+          <!-- 3-Tier Valuation Price Bands -->
+          <div class="val-bands-container">
+            <div class="val-bands-title-row">
+              <span class="sub-title">📊 基本面三段式量化估值</span>
+              <span class="val-eps-pe" id="valEpsPeText">EPS: -- 元 | 本益比: -- 倍 | 市值: --</span>
+            </div>
+            
+            <div class="val-ladder-grid">
+              <!-- Tier 1: 保守便宜價 -->
+              <div class="val-ladder-item tier-low">
+                <div class="ladder-tag">🟢 保守便宜價</div>
+                <div class="ladder-price" id="valLowPrice">-- 元</div>
+                <div class="ladder-desc" id="valLowDesc">防守安全邊際</div>
+              </div>
+              <div class="val-ladder-divider">➔</div>
+              <!-- Tier 2: 合理中位價 -->
+              <div class="val-ladder-item tier-mid">
+                <div class="ladder-tag">🔵 合理中位價</div>
+                <div class="ladder-price" id="valMidPrice">-- 元</div>
+                <div class="ladder-desc" id="valMidDesc">多頭健康成長</div>
+              </div>
+              <div class="val-ladder-divider">➔</div>
+              <!-- Tier 3: 波段樂觀價 -->
+              <div class="val-ladder-item tier-high">
+                <div class="ladder-tag">🟣 波段樂觀價</div>
+                <div class="ladder-price" id="valHighPrice">-- 元</div>
+                <div class="ladder-desc" id="valHighDesc">昂貴天花板</div>
+              </div>
+            </div>
+
+            <!-- Visual Price Position Gauge Bar -->
+            <div class="val-gauge-wrapper">
+              <div class="val-gauge-bar">
+                <div class="gauge-zone zone-cheap" title="低估便宜區"></div>
+                <div class="gauge-zone zone-fair" title="合理中位區"></div>
+                <div class="gauge-zone zone-high" title="昂貴超買區"></div>
+                <div class="gauge-pointer" id="valGaugePointer" style="left: 50%;">
+                  <span class="pointer-arrow">▲</span>
+                  <span class="pointer-label" id="valGaugeLabel">現價 --</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="val-advice-box" id="valAdviceBox">
+              💡 正在計算法人估值模型...
+            </div>
+          </div>
+
+          <!-- Technical Wave & Fibonacci Targets -->
+          <div class="fibo-targets-row">
+            <div class="fibo-item">
+              <span class="f-label">📐 波段打底區間：</span>
+              <span class="f-val" id="fiboBaseRange">-- ~ -- 元</span>
+            </div>
+            <div class="fibo-item">
+              <span class="f-label">🚀 第 1 波段滿足點 (1.0x)：</span>
+              <span class="f-val color-gold" id="fiboTarget1">-- 元</span>
+            </div>
+            <div class="fibo-item">
+              <span class="f-label">🔥 黃金分割擴展點 (1.618x)：</span>
+              <span class="f-val color-purple" id="fiboTarget2">-- 元</span>
+            </div>
+          </div>
+
+          <!-- Hype / Scam Checker Tool (外傳目標價/分析師喊單健檢器) -->
+          <div class="hype-checker-box">
+            <div class="hype-header">
+              <div class="hype-header-left">
+                <span class="hype-icon">🕵️</span>
+                <span class="hype-title">外傳目標價／股票群喊單健檢器</span>
+              </div>
+              <span class="hype-tip">防詐騙 · 破解本夢比吹捧</span>
+            </div>
+            <div class="hype-input-row">
+              <label for="hypeTargetInput">群組分析師喊多少？</label>
+              <div class="input-with-btn">
+                <input type="number" id="hypeTargetInput" placeholder="輸入聽到的目標價 (如: 1000)" step="1">
+                <button type="button" class="btn-hype-check" id="btnHypeCheck">立即健檢真實性</button>
+              </div>
+            </div>
+            <div class="hype-result-card" id="hypeResultCard" style="display: none;">
+              <div class="hype-metrics">
+                <div class="hm-item">
+                  <span class="hm-label">預期還需漲幅：</span>
+                  <span class="hm-val" id="hmGain">--%</span>
+                </div>
+                <div class="hm-item">
+                  <span class="hm-label">隱含本益比：</span>
+                  <span class="hm-val" id="hmPe">-- 倍</span>
+                </div>
+                <div class="hm-item">
+                  <span class="hm-label">隱含企業總市值：</span>
+                  <span class="hm-val" id="hmMcap">-- 兆元</span>
+                </div>
+              </div>
+              <div class="hype-verdict-banner" id="hypeVerdict">
+                <!-- Dynamic diagnostic verdict -->
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- TradingView Interactive Chart Container with OHLC Crosshair Bar -->
         <div class="tv-chart-wrapper">
           <div class="tv-ohlc-bar" id="tvOhlcBar">

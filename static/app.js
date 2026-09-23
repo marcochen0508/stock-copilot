@@ -1498,6 +1498,120 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
     tvTfTag.textContent = isM ? "月K" : (isW ? "週K" : "日K");
   }
 
+  // -------------------------------------------------------------
+  // Institutional 3-Tier Valuation & Science Targets Rendering
+  // -------------------------------------------------------------
+  const val = stock.valuation || {};
+  const valCard = document.getElementById("valuationTargetCard");
+  if (valCard) {
+    valCard.style.display = "block";
+
+    // Status Badge
+    const valBadgeEl = document.getElementById("valStatusBadge");
+    if (valBadgeEl) {
+      valBadgeEl.textContent = val.val_badge || "合理分析";
+      valBadgeEl.style.color = val.val_color || "#38bdf8";
+      valBadgeEl.style.borderColor = val.val_color || "#38bdf8";
+      valBadgeEl.style.backgroundColor = `${val.val_color}22` || "rgba(56, 189, 248, 0.15)";
+    }
+
+    // EPS & PE info
+    const valEpsPeText = document.getElementById("valEpsPeText");
+    if (valEpsPeText) {
+      if (val.is_etf) {
+        valEpsPeText.textContent = `ETF 指數型資產 | 歷史波動統計估值`;
+      } else {
+        const epsStr = val.eps > 0 ? `${val.eps} 元` : '未揭露';
+        const peStr = val.pe > 0 ? `${val.pe} 倍` : '無';
+        const mcapStr = val.market_cap_text || '--';
+        valEpsPeText.textContent = `預估EPS: ${epsStr} | 本益比: ${peStr} | 總市值: ${mcapStr}`;
+      }
+    }
+
+    // Ladder Prices
+    const valLowPriceEl = document.getElementById("valLowPrice");
+    if (valLowPriceEl) valLowPriceEl.textContent = val.val_low != null ? `${val.val_low} 元` : '--';
+
+    const valMidPriceEl = document.getElementById("valMidPrice");
+    if (valMidPriceEl) valMidPriceEl.textContent = val.val_mid != null ? `${val.val_mid} 元` : '--';
+
+    const valHighPriceEl = document.getElementById("valHighPrice");
+    if (valHighPriceEl) valHighPriceEl.textContent = val.val_high != null ? `${val.val_high} 元` : '--';
+
+    // Descriptions
+    const valLowDescEl = document.getElementById("valLowDesc");
+    if (valLowDescEl) {
+      valLowDescEl.textContent = val.is_etf ? "下檔季線防守" : `保守估值 (${val.pe_low}x PE)`;
+    }
+    const valMidDescEl = document.getElementById("valMidDesc");
+    if (valMidDescEl) {
+      valMidDescEl.textContent = val.is_etf ? "多頭中軸支撐" : `合理中位 (${val.pe_mid}x PE)`;
+    }
+    const valHighDescEl = document.getElementById("valHighDesc");
+    if (valHighDescEl) {
+      valHighDescEl.textContent = val.is_etf ? "波段上檔壓力" : `樂觀天花板 (${val.pe_high}x PE)`;
+    }
+
+    // Price Gauge Pointer
+    const pointerEl = document.getElementById("valGaugePointer");
+    const pointerLabel = document.getElementById("valGaugeLabel");
+    if (pointerEl && pointerLabel) {
+      pointerLabel.textContent = `現價 ${stock.price}`;
+      const p = stock.price;
+      const low = val.val_low || (p * 0.85);
+      const mid = val.val_mid || p;
+      const high = val.val_high || (p * 1.15);
+      
+      let pct = 50;
+      if (p <= low) {
+        pct = Math.max(5, (p / (low || 1)) * 30);
+      } else if (p <= mid) {
+        pct = 33 + ((p - low) / (mid - low || 1)) * 33;
+      } else if (p <= high) {
+        pct = 66 + ((p - mid) / (high - mid || 1)) * 30;
+      } else {
+        pct = Math.min(96, 96 + ((p - high) / (high || 1)) * 10);
+      }
+      pointerEl.style.left = `${Math.min(95, Math.max(5, pct))}%`;
+    }
+
+    // Advice
+    const valAdviceEl = document.getElementById("valAdviceBox");
+    if (valAdviceEl) {
+      valAdviceEl.textContent = `💡 ${val.val_advice || '法人估值數據穩定更新中。'}`;
+    }
+
+    // Fibonacci Targets
+    const fiboBaseEl = document.getElementById("fiboBaseRange");
+    if (fiboBaseEl) {
+      fiboBaseEl.textContent = `${val.swing_low || '--'} ~ ${val.swing_high || '--'} 元`;
+    }
+    const fiboT1El = document.getElementById("fiboTarget1");
+    if (fiboT1El) fiboT1El.textContent = val.fibo_target_1 ? `${val.fibo_target_1} 元` : '--';
+    const fiboT2El = document.getElementById("fiboTarget2");
+    if (fiboT2El) fiboT2El.textContent = val.fibo_target_2 ? `${val.fibo_target_2} 元` : '--';
+
+    // Reset Hype Checker for active stock
+    const hypeInput = document.getElementById("hypeTargetInput");
+    if (hypeInput) {
+      hypeInput.value = "";
+      hypeInput.placeholder = `輸入分析師喊的目標價 (如: ${Math.round(stock.price * 1.4)})`;
+    }
+    const hypeCard = document.getElementById("hypeResultCard");
+    if (hypeCard) hypeCard.style.display = "none";
+
+    // Bind Hype Checker button click
+    const btnHype = document.getElementById("btnHypeCheck");
+    if (btnHype) {
+      btnHype.onclick = () => runHypeCheck(stock, val);
+    }
+    if (hypeInput) {
+      hypeInput.onkeyup = (e) => {
+        if (e.key === "Enter") runHypeCheck(stock, val);
+      };
+    }
+  }
+
   // Draw Chart
   drawCandleChart(stock.candles, stock.support, stock.resistance, stock.timeframe);
   if (shouldOpenModal) {
@@ -1512,6 +1626,62 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
       }
     }, 150);
   }
+}
+
+// Interactive Hype / Scam Target Price Checker
+function runHypeCheck(stock, val) {
+  const inputEl = document.getElementById("hypeTargetInput");
+  const targetVal = parseFloat(inputEl.value);
+  if (!targetVal || targetVal <= 0) {
+    alert("請輸入有效的預期目標價金額！");
+    return;
+  }
+
+  const curPrice = stock.price;
+  const gainPct = (((targetVal - curPrice) / curPrice) * 100).toFixed(1);
+  const eps = val.eps || 0;
+  const impliedPe = (eps > 0) ? (targetVal / eps).toFixed(1) : null;
+  const shares = val.shares || 0;
+  const impliedMcapTwd = (shares > 0) ? ((targetVal * shares) / 1000000000000) : null;
+
+  document.getElementById("hmGain").textContent = `${gainPct > 0 ? '+' : ''}${gainPct}%`;
+  document.getElementById("hmGain").className = `hm-val ${gainPct > 0 ? 'color-up' : 'color-down'}`;
+
+  document.getElementById("hmPe").textContent = impliedPe ? `${impliedPe} 倍` : '無法推算';
+  document.getElementById("hmMcap").textContent = impliedMcapTwd ? `${impliedMcapTwd.toFixed(2)} 兆元` : '未揭露';
+
+  const verdictEl = document.getElementById("hypeVerdict");
+  verdictEl.className = "hype-verdict-banner";
+
+  if (val.is_etf) {
+    if (gainPct > 60) {
+      verdictEl.classList.add("verdict-danger");
+      verdictEl.innerHTML = `⚠️ <b>嚴重偏離現實（極度誇大吹捧）</b><br>ETF 追蹤的是一籃子大盤或成分股，要求短中期暴漲 +${gainPct}%，相當於台股大盤指數暴漲數萬點，在實體經濟中機率極低，是典型的群組帶單口號！`;
+    } else if (gainPct > 30) {
+      verdictEl.classList.add("verdict-warning");
+      verdictEl.innerHTML = `🟡 <b>波段超強多頭預期</b><br>需要台股大盤展開歷史級超級主升段，建議隨行情分批停利，切勿在過熱時追價。`;
+    } else {
+      verdictEl.classList.add("verdict-good");
+      verdictEl.innerHTML = `✅ <b>符合正常景氣波段空間</b><br>預期漲幅在合理波動範圍內，配合定期定額或均線支撐操作更穩健。`;
+    }
+  } else {
+    if (impliedPe && Number(impliedPe) > 35) {
+      verdictEl.classList.add("verdict-danger");
+      const mcapNote = impliedMcapTwd ? `市值將暴增至 <b>${impliedMcapTwd.toFixed(2)} 兆台幣</b>，` : '';
+      verdictEl.innerHTML = `🚨 <b>【詐騙／吹捧高風險警報】嚴重脫離產業現實！</b><br>若達到此目標價，隱含本益比將飆破 <b>${impliedPe} 倍</b>！${mcapNote}在成熟科技製造或電子代工產業中，基本面完全無法支撐此等天文數字！這是標準的股票群「畫大餅、誘使散戶追高抬轎」話術，<b>切勿盲目相信！</b>`;
+    } else if (impliedPe && Number(impliedPe) > 22) {
+      verdictEl.classList.add("verdict-warning");
+      verdictEl.innerHTML = `⚠️ <b>【高風險本夢比】極度樂觀牛市推估</b><br>隱含本益比達 <b>${impliedPe} 倍</b>，已高於法人合理評價區間，除非未來幾季營收連續倍增，否則高檔容易遭遇主力獲利了結倒貨，防守停損必須極度嚴格！`;
+    } else if (impliedPe && Number(impliedPe) >= 14) {
+      verdictEl.classList.add("verdict-good");
+      verdictEl.innerHTML = `🎯 <b>【合理波段範圍】具備法人研究報告依據</b><br>隱含本益比為 <b>${impliedPe} 倍</b>，落在法人合理評價區間內，只要基本面營收動能持續，波段達標機率高。`;
+    } else {
+      verdictEl.classList.add("verdict-good");
+      verdictEl.innerHTML = `🟢 <b>【防守便宜價】目標設定穩健</b><br>隱含本益比偏低，下檔安全邊際充足。`;
+    }
+  }
+
+  document.getElementById("hypeResultCard").style.display = "block";
 }
 
 // Background prefetch alternate timeframe (e.g. fetch Weekly/Monthly while viewing Daily)
