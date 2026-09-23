@@ -1454,6 +1454,21 @@ body {
   margin-bottom: 2px;
 }
 
+.lvl-name.clickable-term {
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.35);
+  display: inline-block;
+  width: fit-content;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.lvl-name.clickable-term:hover {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+}
+
 .lvl-val {
   font-family: var(--font-mono);
   font-weight: 800;
