@@ -215,7 +215,6 @@ function getStockStrategyTag(stock) {
     return {
       type: "stock-div",
       className: "type-stock-div",
-      icon: "🌱",
       label: "配股複利",
       tooltip: "本檔常年有股票股利（配股），適合長期靠配股張數自我繁殖複利！"
     };
@@ -226,7 +225,6 @@ function getStockStrategyTag(stock) {
     return {
       type: "income",
       className: "type-income",
-      icon: "💰",
       label: "高息型",
       tooltip: `現金殖利率約 ${y}%，著重穩定領取現金股利，防守收息為主！`
     };
@@ -237,7 +235,6 @@ function getStockStrategyTag(stock) {
     return {
       type: "growth",
       className: "type-growth",
-      icon: "🚀",
       label: "價差成長",
       tooltip: "著重營收獲利爆發力與股價漲幅（資本利得），目標是賺取波段大價差而非死存領息！"
     };
@@ -247,7 +244,6 @@ function getStockStrategyTag(stock) {
   return {
     type: "income",
     className: "type-income",
-    icon: "💵",
     label: "穩健收息",
     tooltip: `殖利率約 ${y}%，具有穩定營運與防禦收息特性。`
   };
@@ -798,12 +794,37 @@ async function loadPortfolioData(forceSync = false) {
     syncStatus.textContent = `🟢 已連線${isCustom ? '個人' : ''}試算表 (更新: ${data.synced_at.split(' ')[1]})`;
     renderPersonTabs();
     renderActiveTabContent();
+    preloadHoldingsCharts(data);
   } catch (err) {
     syncStatus.textContent = "試算表連線失敗";
     console.error("Error loading portfolios:", err);
   } finally {
     btnSync.classList.remove("loading");
   }
+}
+
+// Background preload top holdings' charts so that clicking them opens with 0ms delay
+function preloadHoldingsCharts(portfolioData) {
+  if (!portfolioData || !portfolioData.aggregate || !portfolioData.aggregate.holdings) return;
+  const holdings = portfolioData.aggregate.holdings.slice(0, 10);
+  let delay = 1200;
+  holdings.forEach(h => {
+    const code = String(h.code).trim().toUpperCase();
+    setTimeout(() => {
+      const cacheKey = `${code}_D`;
+      if (!stockDetailClientCache.has(cacheKey)) {
+        fetch(`/api/stock/${code}?tf=D`)
+          .then(res => res.ok ? res.json() : null)
+          .then(res => {
+            if (res && res.stock) {
+              stockDetailClientCache.set(cacheKey, { data: res, timestamp: Date.now() });
+            }
+          })
+          .catch(() => {});
+      }
+    }, delay);
+    delay += 900;
+  });
 }
 
 // Render dynamic tabs: [全部總覽], [阿良], [甘露涓], [景維], [阿輝], [未持股觀察名單]
@@ -1028,7 +1049,7 @@ function renderActiveTabContent() {
           <div class="stock-title-badge-row">
             <span class="name">${h.name}</span>
             <span class="badge-stock-type ${stratTag.className}" data-term="stock_type" title="${stratTag.tooltip}">
-              ${stratTag.icon} ${stratTag.label}
+              ${stratTag.label}
             </span>
           </div>
         </div>
@@ -1286,7 +1307,7 @@ async function renderWatchlistView() {
               <div class="stock-title-badge-row">
                 <span class="name">${item.name || s.code}</span>
                 <span class="badge-stock-type ${stratTag.className}" data-term="stock_type" title="${stratTag.tooltip}">
-                  ${stratTag.icon} ${stratTag.label}
+                  ${stratTag.label}
                 </span>
               </div>
             </div>
