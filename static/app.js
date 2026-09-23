@@ -1457,15 +1457,41 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
   // Key Levels
   const isM = (stock.timeframe === "M");
   const isW = (stock.timeframe === "W");
+
+  // 5MA
+  const lvlMA5Title = document.getElementById("lvlMA5Title");
+  if (lvlMA5Title) lvlMA5Title.textContent = isM ? "5月均線：" : (isW ? "5週均線：" : "5MA週線：");
+  const lvlMA5El = document.getElementById("lvlMA5");
+  if (lvlMA5El) lvlMA5El.textContent = stock.ma5 != null ? stock.ma5 : "--";
+
+  // 20MA
+  const lvlMA20Title = document.getElementById("lvlMA20Title");
+  if (lvlMA20Title) lvlMA20Title.textContent = isM ? "20月均線：" : (isW ? "20週均線：" : "20MA月線：");
   const lvlMA20El = document.getElementById("lvlMA20");
-  if (lvlMA20El && lvlMA20El.previousElementSibling) {
-    lvlMA20El.previousElementSibling.textContent = isM ? "20月均線：" : (isW ? "20週均線：" : "20MA月線：");
+  if (lvlMA20El) lvlMA20El.textContent = stock.ma20 != null ? stock.ma20 : "--";
+
+  // 60MA
+  const lvlMA60Title = document.getElementById("lvlMA60Title");
+  if (lvlMA60Title) lvlMA60Title.textContent = isM ? "60月均線：" : (isW ? "60週均線：" : "60MA季線：");
+  const lvlMA60El = document.getElementById("lvlMA60");
+  if (lvlMA60El) lvlMA60El.textContent = stock.ma60 != null ? stock.ma60 : "--";
+
+  const lvlSupportEl = document.getElementById("lvlSupport");
+  if (lvlSupportEl) lvlSupportEl.textContent = stock.support != null ? stock.support : "--";
+
+  const lvlResEl = document.getElementById("lvlResistance");
+  if (lvlResEl) lvlResEl.textContent = stock.resistance != null ? stock.resistance : "--";
+
+  const lvlKDEl = document.getElementById("lvlKD");
+  if (lvlKDEl) lvlKDEl.textContent = `K: ${stock.k != null ? stock.k : '--'} / D: ${stock.d != null ? stock.d : '--'}`;
+
+  const lvlRSIEl = document.getElementById("lvlRSI");
+  if (lvlRSIEl) {
+    const rsiNum = Number(stock.rsi);
+    lvlRSIEl.textContent = (stock.rsi != null) 
+      ? `${stock.rsi} (${rsiNum > 70 ? '過熱' : (rsiNum < 30 ? '超賣' : '健康')})` 
+      : '--';
   }
-  lvlMA20El.textContent = stock.ma20;
-  document.getElementById("lvlSupport").textContent = stock.support;
-  document.getElementById("lvlResistance").textContent = stock.resistance;
-  document.getElementById("lvlKD").textContent = `K: ${stock.k} / D: ${stock.d}`;
-  document.getElementById("lvlRSI").textContent = `${stock.rsi} (${stock.rsi > 70 ? '過熱' : (stock.rsi < 30 ? '超賣' : '健康')})`;
 
   const tvTfTag = document.getElementById("tvTfTag");
   if (tvTfTag) {
@@ -1644,9 +1670,18 @@ function drawCandleChart(candles, support, resistance, timeframe = "D") {
   const container = document.getElementById("tvChartContainer");
   if (!container) return;
 
+  const isM = (timeframe === "M");
   const isW = (timeframe === "W");
   const tfTag = document.getElementById("tvTfTag");
-  if (tfTag) tfTag.textContent = isW ? "週K" : "日K";
+  if (tfTag) tfTag.textContent = isM ? "月K" : (isW ? "週K" : "日K");
+
+  // Update Top Chart MA Legend tags
+  const tag5 = document.getElementById("chartMa5Tag");
+  const tag20 = document.getElementById("chartMa20Tag");
+  const tag60 = document.getElementById("chartMa60Tag");
+  if (tag5) tag5.textContent = isM ? "● 5月均線" : (isW ? "● 5週均線" : "● 5MA");
+  if (tag20) tag20.textContent = isM ? "● 20月均線" : (isW ? "● 20週均線" : "● 20MA");
+  if (tag60) tag60.textContent = isM ? "● 60月均線" : (isW ? "● 60週均線" : "● 60MA");
 
   // Clean old instance
   if (tvChart) {
@@ -1751,7 +1786,7 @@ function drawCandleChart(candles, support, resistance, timeframe = "D") {
   tvMa5Series = tvChart.addLineSeries({
     color: "#f59e0b",
     lineWidth: 1.5,
-    title: isW ? "5週線" : "5MA",
+    title: isM ? "5月線" : (isW ? "5週線" : "5MA"),
     priceLineVisible: false
   });
   const ma5Data = candles.filter(c => c.ma5 != null).map(c => ({ time: c.date, value: c.ma5 }));
@@ -1760,7 +1795,7 @@ function drawCandleChart(candles, support, resistance, timeframe = "D") {
   tvMa20Series = tvChart.addLineSeries({
     color: "#3b82f6",
     lineWidth: 2,
-    title: isW ? "20週線" : "20MA",
+    title: isM ? "20月線" : (isW ? "20週線" : "20MA"),
     priceLineVisible: false
   });
   const ma20Data = candles.filter(c => c.ma20 != null).map(c => ({ time: c.date, value: c.ma20 }));
@@ -1769,7 +1804,7 @@ function drawCandleChart(candles, support, resistance, timeframe = "D") {
   tvMa60Series = tvChart.addLineSeries({
     color: "#a855f7",
     lineWidth: 1.5,
-    title: isW ? "60週線" : "60MA",
+    title: isM ? "60月線" : (isW ? "60週線" : "60MA"),
     priceLineVisible: false
   });
   const ma60Data = candles.filter(c => c.ma60 != null).map(c => ({ time: c.date, value: c.ma60 }));

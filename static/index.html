@@ -378,26 +378,34 @@
           </div>
         </div>
 
-        <!-- Technical Key Levels Bar -->
+        <!-- Technical Key Levels Bar (所有關鍵名詞與數值均可直接點擊看白話解說) -->
         <div class="key-levels-bar">
-          <div class="level-item">
-            <span class="lvl-name clickable-term" data-term="ma20" title="點擊查看 均線生命線 白話說明">20MA月線：</span>
-            <span class="lvl-val" id="lvlMA20">--</span>
+          <div class="level-item clickable-term" data-term="ma5" title="點擊查看 5MA週線 白話說明">
+            <span class="lvl-name" id="lvlMA5Title">5MA週線：</span>
+            <span class="lvl-val color-gold" id="lvlMA5">--</span>
           </div>
-          <div class="level-item">
-            <span class="lvl-name clickable-term" data-term="support" title="點擊查看 關鍵支撐 白話說明">關鍵支撐：</span>
+          <div class="level-item clickable-term" data-term="ma20" title="點擊查看 20MA月線 白話說明">
+            <span class="lvl-name" id="lvlMA20Title">20MA月線：</span>
+            <span class="lvl-val color-blue" id="lvlMA20">--</span>
+          </div>
+          <div class="level-item clickable-term" data-term="ma60" title="點擊查看 60MA季線 白話說明">
+            <span class="lvl-name" id="lvlMA60Title">60MA季線：</span>
+            <span class="lvl-val color-purple" id="lvlMA60">--</span>
+          </div>
+          <div class="level-item clickable-term" data-term="support" title="點擊查看 關鍵支撐 白話說明">
+            <span class="lvl-name">關鍵支撐：</span>
             <span class="lvl-val color-green" id="lvlSupport">--</span>
           </div>
-          <div class="level-item">
-            <span class="lvl-name clickable-term" data-term="resistance" title="點擊查看 短線壓力 白話說明">短線壓力：</span>
+          <div class="level-item clickable-term" data-term="resistance" title="點擊查看 短線壓力 白話說明">
+            <span class="lvl-name">短線壓力：</span>
             <span class="lvl-val color-red" id="lvlResistance">--</span>
           </div>
-          <div class="level-item">
-            <span class="lvl-name clickable-term" data-term="kd" title="點擊查看 KD指標 白話說明">KD指標：</span>
+          <div class="level-item clickable-term" data-term="kd" title="點擊查看 KD指標 白話說明">
+            <span class="lvl-name">KD指標：</span>
             <span class="lvl-val" id="lvlKD">K: -- / D: --</span>
           </div>
-          <div class="level-item">
-            <span class="lvl-name clickable-term" data-term="rsi" title="點擊查看 RSI強弱 白話說明">RSI強弱：</span>
+          <div class="level-item clickable-term" data-term="rsi" title="點擊查看 RSI強弱 白話說明">
+            <span class="lvl-name">RSI強弱：</span>
             <span class="lvl-val" id="lvlRSI">--</span>
           </div>
         </div>
@@ -414,7 +422,14 @@
               <span class="tv-item">漲跌 <b id="tvChange">--</b></span>
               <span class="tv-item">量 <b id="tvVol">-- 張</b></span>
             </div>
-            <span class="tv-hint">💡 支援滑鼠滾輪/雙指縮放與拖曳</span>
+            <div class="tv-ma-legend-items">
+              <span class="ma-legend-tag ma-tag-5 clickable-term" id="chartMa5Tag" data-term="ma5" title="點擊查看 5MA週線 白話解說">● 5MA</span>
+              <span class="ma-legend-tag ma-tag-20 clickable-term" id="chartMa20Tag" data-term="ma20" title="點擊查看 20MA生命線 白話解說">● 20MA</span>
+              <span class="ma-legend-tag ma-tag-60 clickable-term" id="chartMa60Tag" data-term="ma60" title="點擊查看 60MA季線 白話解說">● 60MA</span>
+              <span class="ma-legend-tag ma-tag-res clickable-term" data-term="resistance" title="點擊查看 短線壓力 白話解說">● 短線壓力</span>
+              <span class="ma-legend-tag ma-tag-sup clickable-term" data-term="support" title="點擊查看 關鍵支撐 白話解說">● 關鍵支撐</span>
+            </div>
+            <span class="tv-hint">💡 點擊指標直接看說明</span>
           </div>
           
           <div class="chart-canvas-container" id="chartCanvasContainer">

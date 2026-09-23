@@ -1427,43 +1427,61 @@ body {
 
 .key-levels-bar {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 16px 24px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 12px 16px;
   border-radius: var(--radius-sm);
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   font-size: 14px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .key-levels-bar {
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .key-levels-bar {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 .level-item {
   display: flex;
   flex-direction: column;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.level-item.clickable-term {
+  cursor: pointer;
+  user-select: none;
+}
+
+.level-item.clickable-term:hover {
+  background: rgba(56, 189, 248, 0.09);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
 }
 
 .lvl-name {
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   margin-bottom: 2px;
-}
-
-.lvl-name.clickable-term {
-  cursor: pointer;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.35);
   display: inline-block;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.35);
   width: fit-content;
   transition: all 0.2s ease;
-  user-select: none;
 }
 
-.lvl-name.clickable-term:hover {
+.level-item:hover .lvl-name {
   color: #38bdf8;
   border-bottom-color: #38bdf8;
   text-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
@@ -2606,6 +2624,51 @@ body {
   color: #38bdf8;
   border-bottom-color: #38bdf8;
 }
+
+#glossaryModal,
+#stockNoteModal {
+  z-index: 100010 !important;
+}
+
+.color-blue {
+  color: #3b82f6 !important;
+}
+
+.color-purple {
+  color: #a855f7 !important;
+}
+
+/* 線圖上方均線與壓力支撐標籤 */
+.tv-ma-legend-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+
+.ma-legend-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.ma-legend-tag:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.3);
+}
+
+.ma-tag-5 { color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+.ma-tag-20 { color: #3b82f6; border-color: rgba(59, 130, 246, 0.4); }
+.ma-tag-60 { color: #a855f7; border-color: rgba(168, 85, 247, 0.4); }
+.ma-tag-res { color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+.ma-tag-sup { color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
 
 /* -------------------------------------------------------------
    個人股票備忘錄彈窗 (Note Modal)
