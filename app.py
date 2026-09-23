@@ -427,6 +427,13 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 def health_check():
     return {"status": "ok"}
 
+@app.get("/favicon.ico")
+def favicon():
+    favicon_path = os.path.join(static_dir, "favicon.ico")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path)
+    return JSONResponse(status_code=404, content={"message": "No favicon"})
+
 @app.get("/")
 def read_root():
     index_path = os.path.join(static_dir, "index.html")
