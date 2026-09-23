@@ -102,6 +102,245 @@ let watchlistStocks = getSavedWatchlist();
 const LS_PORTFOLIOS_KEY = "tw_portfolios_instant_cache_v1";
 const LS_MACRO_KEY = "tw_macro_instant_cache_v1";
 
+// -------------------------------------------------------------
+// 全域排序狀態與欄位定義
+// -------------------------------------------------------------
+let currentSort = {
+  key: null,      // 欄位名稱
+  order: 'desc'   // 'asc' 或 'desc'
+};
+
+// -------------------------------------------------------------
+// 股票小白白話辭典資料庫 (生動大白話比喻 + 實戰操作指南)
+// -------------------------------------------------------------
+const STOCK_GLOSSARY = {
+  "yield": {
+    term: "現金殖利率",
+    plain: "【就像銀行存款利率！】把錢買這檔股票，每年能拿到多少%的現金利息。計算公式是（每年發放的現金股利 ÷ 目前股價）。例如買 100 元的股票，今年發 5 元現金，殖利率就是 5%。",
+    action: "殖利率 5% 以上通常是熱門的高股息收息股！但小白切記：要挑選獲利穩定能『填息』的公司，才不會『賺了股息，卻賠了股價價差』。"
+  },
+  "dividend": {
+    term: "預估年股利",
+    plain: "【今年預計能領到多少新台幣紅包！】系統根據你持有的所有股數，乘以這檔股票近一年的每股配息金額，幫你算出來一年總共會匯進你銀行的現金總額。",
+    action: "存股領息族最在意的數字！如果目標是每個月替自己加薪 1 萬元（一年 12 萬），可以觀察這個欄位有沒有逐年達標。"
+  },
+  "pnl": {
+    term: "未實現損益",
+    plain: "【紙上富貴或暫時虧損！】如果你『今天此時此刻』把手上的股票全部在市場上賣掉，扣掉當初買進的總成本後，帳面上賺或賠多少新台幣。因為還沒真正按『賣出』，所以叫做『未實現』。",
+    action: "紅色代表目前帳面有賺錢（獲利中）；綠色代表暫時虧損（套牢中）。短線波動不用每天自己嚇自己，關鍵看公司的基本面與防守線。"
+  },
+  "roi": {
+    term: "報酬率 (ROI)",
+    plain: "【賺或賠的趴數（%）！】你投入的本金，目前總共賺了或賠了幾百分比。計算是（未實現損益 ÷ 投入總成本）× 100%。",
+    action: "報酬率超過 +20% ~ +30% 時，小白可以考慮先賣出一半把本金拿回來（獲利入袋放口袋），剩下的部位零成本安心讓它繼續跑！"
+  },
+  "decision": {
+    term: "智能決策系統",
+    plain: "【你的專屬量化副駕駛！】系統自動結合均線生命線（20MA）、壓力支撐、KD過熱度、以及外資投信三大法人進出，每分每秒替你持有的個股做出最理性的買賣診斷。",
+    action: "看到『多頭續抱』就安心坐好；看到『拉回加碼買點』可小額補貨；看到『停損警戒』代表破線轉弱，一定要遵守紀律保本為上！"
+  },
+  "support_loss": {
+    term: "關鍵防守價（關鍵支撐 / 停損點）",
+    plain: "【股價跌下來時的彈簧床與地板！】大戶法人通常會在某些重要價位（如月線、前波低點）防守。一旦股價跌破這個底線，就像踩破地板一樣，下方可能深不見底！",
+    action: "【小白保命最重要的心法】收盤如果有效跌破這個關鍵防守價，建議壯士斷腕嚴格停損！寧可小賠幾千元，也絕對不要變成套牢幾十萬的萬年冤大頭。"
+  },
+  "notes": {
+    term: "股票專屬備忘與操作策略",
+    plain: "【每檔股票專屬的作戰筆記本！】每個人對每檔股票的想法不同，有人想領股息、有人想波段停利。按一下『備註』就可以寫下你對這檔股票接下來的計畫！",
+    action: "直接儲存在您現在的瀏覽器中，別人看不到，換頁也不會消失。寫下『1050 先賣一半』或『跌到 900 加碼 1 張』，能幫助你克服市場貪婪與恐懼！"
+  },
+  "stock_type": {
+    term: "高息型 vs 價差成長型",
+    plain: "【買這檔股票到底是為了領利息，還是賺價差？】<br>💰 <b>高息型</b>：每年固定發放優渥現金（殖利率通常 > 5%），像包租公收房租，股價通常比較穩健。<br>🚀 <b>價差成長型</b>：公司賺的錢拿去再投資建廠（如台積電），股利可能發得少，但股價一漲可能就是翻倍，重點在賺資本利得（價差）！<br>🌱 <b>配股型</b>：除了發現金還送股票（配股），適合張數快速翻倍複利。",
+    action: "買之前先想清楚：想每個月領生活費就選『高息型』；想賺幾十萬大波段價差就選『價差成長型』，策略不要混淆！"
+  },
+  "ma5": {
+    term: "5MA（5日均線 / 週線）",
+    plain: "【極短線溫度計！】過去 5 個交易日所有買進這檔股票的人的平均成本。5 天剛好是一個禮拜的開盤天數。",
+    action: "股價在 5 日線之上代表超短線強勢噴出；一旦跌破 5 日線代表短線衝刺動能趨緩，衝浪客通常會先減碼。"
+  },
+  "ma20": {
+    term: "20MA（20日均線 / 月線生命線）",
+    plain: "【波段多空的生命線！】過去 20 個交易日（大約一個月）的市場平均成交成本。所有波段操盤手最看重的一條線！",
+    action: "只要股價站在月線之上，代表這一個月買的人都賺錢，是多頭市場（安心續抱）；只要跌破月線，代表大家開始虧錢逃命，行情轉為弱勢！"
+  },
+  "ma60": {
+    term: "60MA（60日均線 / 季線）",
+    plain: "【中長線大趨勢方向！】過去一季（約 3 個月）的市場平均成本，是大戶與投信法人的多空格局分水嶺。",
+    action: "季線走平向上代表中長線大趨勢健康偏多；季線向下彎而且股價在季線下面，千萬不要隨便大筆抄底。"
+  },
+  "kd": {
+    term: "KD 指標（隨機指標）",
+    plain: "【短線跑步有沒有衝太快？】由快線 K 與慢線 D 組成，範圍在 0 到 100 之間：<br>• K > 80（超買區）：代表衝刺衝太兇，短線隨時會喘口氣拉回回檔。<br>• K < 20（超賣區）：代表被打太慘跌過頭，隨時會出現反彈跌深反彈。<br>• 黃金交叉（K往上穿過D）：通常是短線轉強買進訊號；死亡交叉（K往下跌破D）則是轉弱賣出訊號。",
+    action: "高檔鈍化時不用自己嚇自己，但若看到高檔死亡交叉且跌破短均線，短線可先落袋為安。"
+  },
+  "rsi": {
+    term: "RSI 強弱指標（相對強弱指標）",
+    plain: "【買方跟賣方拔河誰力氣大！】數值介於 0 到 100：<br>• RSI > 70：買方力氣非常猛烈，但有點過熱。<br>• RSI < 30：賣方力氣佔上風，但可能過度恐慌甩轎。",
+    action: "搭配趨勢使用，強勢股拉回 RSI 來到 50 附近守穩，往往是波段很好的切入點。"
+  },
+  "chips": {
+    term: "三大法人籌碼（外資 / 投信 / 自營商）",
+    plain: "【市場上的三隻超級大鯨魚！】<br>• 外資：國外的超大機構資金，資金最雄厚。<br>• 投信：台灣國內基金經理人，選股精準、最懂中小型飆股與認養作帳！<br>• 自營商：證券商自己的操盤部，通常愛做極短線沖銷。",
+    action: "【主力密碼】只要看到『外資 + 投信同買（土洋齊買）』連續好幾天，通常股價易漲難跌；若雙方聯手大賣，一定要提防大戶出貨！"
+  },
+  "resistance": {
+    term: "短線壓力（天花板）",
+    plain: "【股價往上撞到的天花板！】以前很多人在那個價格買進被套牢，現在股價漲回那個價位，那些被套牢的人終於能解套，紛紛急著賣掉換現金，造成上方一堆賣壓。",
+    action: "若挑戰壓力位但沒有足夠的成交量（量縮），很容易被敲下來，這時候切忌追高；唯有『帶大成交量突破』才是強勢發動訊號！"
+  },
+  "bias": {
+    term: "乖離率 (BIAS)",
+    plain: "【牽著小狗散步的皮帶！】股價就像小狗，月線就像主人。小狗往前跑太遠（正乖離過大），皮帶拉緊了早晚要回頭跑回主人身邊；被踹太遠（負乖離過大），也會彈回主人身邊。",
+    action: "正乖離率太高（例如股價距離 20MA 超過 8%~10%）時千萬不要衝動追高，容易買在最高點；等它拉回靠近主人（均線）再買最安全。"
+  }
+};
+
+// -------------------------------------------------------------
+// 股票特性膠囊標籤判斷 (高息型 / 價差成長 / 股利配股)
+// -------------------------------------------------------------
+function getStockStrategyTag(stock) {
+  const code = String(stock.code || "").trim();
+  const name = String(stock.name || "").trim();
+  const y = Number(stock.dividend_yield || 0);
+
+  // 1. 配股型（股票股利代表）
+  const stockDivCodes = ["2884", "2834", "2812", "5880", "2886", "2801"];
+  if (stockDivCodes.includes(code)) {
+    return {
+      type: "stock-div",
+      className: "type-stock-div",
+      icon: "🌱",
+      label: "配股複利",
+      tooltip: "本檔常年有股票股利（配股），適合長期靠配股張數自我繁殖複利！"
+    };
+  }
+
+  // 2. 高息型（高殖利率或高股息ETF）
+  if (name.includes("高股息") || name.includes("高息") || ["0056", "00878", "00919", "00929", "00713", "00940", "00934", "00936"].includes(code) || y >= 4.5) {
+    return {
+      type: "income",
+      className: "type-income",
+      icon: "💰",
+      label: "高息型",
+      tooltip: `現金殖利率約 ${y}%，著重穩定領取現金股利，防守收息為主！`
+    };
+  }
+
+  // 3. 價差成長型（科技股、權值成長股）
+  if (["2330", "2454", "2382", "3231", "2317", "2308", "3035", "6669", "3443", "3661"].includes(code) || y < 3.5) {
+    return {
+      type: "growth",
+      className: "type-growth",
+      icon: "🚀",
+      label: "價差成長",
+      tooltip: "著重營收獲利爆發力與股價漲幅（資本利得），目標是賺取波段大價差而非死存領息！"
+    };
+  }
+
+  // 4. 穩健收息
+  return {
+    type: "income",
+    className: "type-income",
+    icon: "💵",
+    label: "穩健收息",
+    tooltip: `殖利率約 ${y}%，具有穩定營運與防禦收息特性。`
+  };
+}
+
+// -------------------------------------------------------------
+// 個人股票獨立備忘錄 (LocalStorage) 管理
+// -------------------------------------------------------------
+function getStockNote(code) {
+  try {
+    const raw = localStorage.getItem(`stock_note_${code}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+
+function saveStockNote(code, noteText) {
+  try {
+    const data = {
+      note: noteText.trim(),
+      updated_at: new Date().toLocaleString('zh-TW', { hour12: false })
+    };
+    localStorage.setItem(`stock_note_${code}`, JSON.stringify(data));
+    return data;
+  } catch (e) {}
+  return null;
+}
+
+function deleteStockNote(code) {
+  try {
+    localStorage.removeItem(`stock_note_${code}`);
+  } catch (e) {}
+}
+
+let activeEditingNoteCode = null;
+let activeEditingNoteName = null;
+
+function openStockNoteModal(code, name) {
+  activeEditingNoteCode = String(code).trim();
+  activeEditingNoteName = name || code;
+
+  const modal = document.getElementById("stockNoteModal");
+  const titleEl = document.getElementById("noteModalStockTitle");
+  const textarea = document.getElementById("stockNoteTextarea");
+  const savedTimeEl = document.getElementById("noteSavedTime");
+
+  if (!modal || !textarea) return;
+
+  titleEl.textContent = `📝 【${activeEditingNoteCode} ${activeEditingNoteName}】個人操作策略與備忘`;
+  const existing = getStockNote(activeEditingNoteCode);
+  if (existing && existing.note) {
+    textarea.value = existing.note;
+    savedTimeEl.textContent = `最後儲存時間: ${existing.updated_at}`;
+  } else {
+    textarea.value = "";
+    savedTimeEl.textContent = "尚未儲存備忘";
+  }
+
+  modal.classList.add("active");
+  textarea.focus();
+}
+
+function closeStockNoteModal() {
+  const modal = document.getElementById("stockNoteModal");
+  if (modal) modal.classList.remove("active");
+  activeEditingNoteCode = null;
+  activeEditingNoteName = null;
+}
+
+// -------------------------------------------------------------
+// 小白術語大白話視窗 (Glossary Modal)
+// -------------------------------------------------------------
+function openGlossaryModal(termKey) {
+  const modal = document.getElementById("glossaryModal");
+  if (!modal) return;
+
+  const g = STOCK_GLOSSARY[termKey] || {
+    term: "股市名詞",
+    plain: "此名詞專為投資人量化分析設計，請參考相關數值變化。",
+    action: "建議搭配均線防守價與法人籌碼同步觀察。"
+  };
+
+  const nameEl = document.getElementById("glossaryTermName");
+  const plainEl = document.getElementById("glossaryPlainExplain");
+  const actionEl = document.getElementById("glossaryActionAdvice");
+
+  if (nameEl) nameEl.textContent = g.term;
+  if (plainEl) plainEl.innerHTML = g.plain.replace(/\n/g, '<br>');
+  if (actionEl) actionEl.innerHTML = g.action.replace(/\n/g, '<br>');
+
+  modal.classList.add("active");
+}
+
+function closeGlossaryModal() {
+  const modal = document.getElementById("glossaryModal");
+  if (modal) modal.classList.remove("active");
+}
+
 function loadFromLocalInstantCache() {
   try {
     const rawMacro = localStorage.getItem(LS_MACRO_KEY);
@@ -236,10 +475,19 @@ function setupEventListeners() {
     });
   }
 
-  // Global Escape key: closes stock modal or bot modal
+  // Global Escape key: closes stock modal, note modal, glossary modal, or bot modal
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (stockModal && stockModal.classList.contains("active")) {
+      const stockModal = document.getElementById("stockModal");
+      const noteModal = document.getElementById("stockNoteModal");
+      const glossaryModal = document.getElementById("glossaryModal");
+      const botModal = document.getElementById("botModal");
+
+      if (glossaryModal && glossaryModal.classList.contains("active")) {
+        closeGlossaryModal();
+      } else if (noteModal && noteModal.classList.contains("active")) {
+        closeStockNoteModal();
+      } else if (stockModal && stockModal.classList.contains("active")) {
         closeStockModal();
       } else if (botModal && botModal.classList.contains("active")) {
         botModal.classList.remove("active");
@@ -247,7 +495,123 @@ function setupEventListeners() {
     }
   });
 
-  // Timeframe selector (日K / 週K 切換)
+  // Setup Sort Headers on Stock Table
+  function setupSortHeaders() {
+    document.querySelectorAll("th.th-sortable").forEach(th => {
+      th.addEventListener("click", (e) => {
+        if (e.target.closest(".term-help")) return;
+
+        const sortKey = th.getAttribute("data-sort");
+        if (!sortKey) return;
+
+        if (currentSort.key === sortKey) {
+          currentSort.order = (currentSort.order === 'asc' ? 'desc' : 'asc');
+        } else {
+          currentSort.key = sortKey;
+          // 代號與名稱預設升冪(小到大)，其他數值預設降冪(大到小)
+          currentSort.order = (sortKey === 'code' || sortKey === 'owner' || sortKey === 'action_label') ? 'asc' : 'desc';
+        }
+
+        document.querySelectorAll("th.th-sortable").forEach(h => {
+          const icon = h.querySelector(".sort-icon");
+          h.classList.remove("sorted-asc", "sorted-desc");
+          if (icon) icon.textContent = "↕";
+        });
+
+        th.classList.add(currentSort.order === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        const curIcon = th.querySelector(".sort-icon");
+        if (curIcon) {
+          curIcon.textContent = (currentSort.order === 'asc' ? '▲' : '▼');
+        }
+
+        renderActiveTabContent();
+      });
+    });
+  }
+  setupSortHeaders();
+
+  // Stock Note Modal Buttons & Quick Tags
+  const noteModal = document.getElementById("stockNoteModal");
+  const btnCloseNoteModal = document.getElementById("btnCloseNoteModal");
+  const btnCancelNoteModal = document.getElementById("btnCancelNoteModal");
+  const btnSaveStockNote = document.getElementById("btnSaveStockNote");
+  const btnClearNote = document.getElementById("btnClearNote");
+  const textareaNote = document.getElementById("stockNoteTextarea");
+
+  if (btnCloseNoteModal) btnCloseNoteModal.addEventListener("click", closeStockNoteModal);
+  if (btnCancelNoteModal) btnCancelNoteModal.addEventListener("click", closeStockNoteModal);
+  if (noteModal) {
+    noteModal.addEventListener("click", (e) => {
+      if (e.target === noteModal) closeStockNoteModal();
+    });
+  }
+
+  // Quick Strategy Tags in Note Modal
+  document.querySelectorAll(".btn-quick-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!textareaNote) return;
+      const textToInsert = btn.getAttribute("data-insert") || btn.textContent.trim();
+      if (textareaNote.value.trim().length > 0) {
+        textareaNote.value += `\n• ${textToInsert}：`;
+      } else {
+        textareaNote.value = `• ${textToInsert}：`;
+      }
+      textareaNote.focus();
+    });
+  });
+
+  if (btnSaveStockNote) {
+    btnSaveStockNote.addEventListener("click", () => {
+      if (!activeEditingNoteCode || !textareaNote) return;
+      const content = textareaNote.value.trim();
+      if (content) {
+        saveStockNote(activeEditingNoteCode, content);
+      } else {
+        deleteStockNote(activeEditingNoteCode);
+      }
+      closeStockNoteModal();
+      // Re-render table to immediately reflect note indicator and tooltip
+      renderActiveTabContent();
+    });
+  }
+
+  if (btnClearNote) {
+    btnClearNote.addEventListener("click", () => {
+      if (!activeEditingNoteCode || !textareaNote) return;
+      if (confirm(`確定要清空股票 ${activeEditingNoteCode} 的備忘紀錄嗎？`)) {
+        deleteStockNote(activeEditingNoteCode);
+        textareaNote.value = "";
+        const savedTimeEl = document.getElementById("noteSavedTime");
+        if (savedTimeEl) savedTimeEl.textContent = "已清空備忘";
+        renderActiveTabContent();
+      }
+    });
+  }
+
+  // Glossary Modal Buttons
+  const glossaryModal = document.getElementById("glossaryModal");
+  const btnCloseGlossaryModal = document.getElementById("btnCloseGlossaryModal");
+  const btnOkGlossaryModal = document.getElementById("btnOkGlossaryModal");
+
+  if (btnCloseGlossaryModal) btnCloseGlossaryModal.addEventListener("click", closeGlossaryModal);
+  if (btnOkGlossaryModal) btnOkGlossaryModal.addEventListener("click", closeGlossaryModal);
+  if (glossaryModal) {
+    glossaryModal.addEventListener("click", (e) => {
+      if (e.target === glossaryModal) closeGlossaryModal();
+    });
+  }
+
+  // Global delegation for glossary term clicks (❓ and clickable terms)
+  document.addEventListener("click", (e) => {
+    const termTarget = e.target.closest("[data-term]");
+    if (termTarget) {
+      e.stopPropagation();
+      const termKey = termTarget.getAttribute("data-term");
+      if (termKey) openGlossaryModal(termKey);
+    }
+  });
+
+  // Timeframe selector (日K / 週K / 月K 切換)
   document.querySelectorAll(".timeframe-selector .tf-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const newTf = btn.getAttribute("data-tf");
@@ -384,6 +748,10 @@ function renderMacro(data) {
     const isDown = item.pct_change < 0;
     const colorClass = isUp ? "color-up" : (isDown ? "color-down" : "color-flat");
     const prefix = isUp ? "+" : "";
+    const changeVal = (item.change !== undefined && item.change !== null) ? Number(item.change) : 0;
+    const changeSign = changeVal > 0 ? "+" : "";
+    const changePtsStr = `${changeSign}${changeVal.toLocaleString()}`;
+    const pctStr = `${prefix}${item.pct_change}%`;
 
     const card = document.createElement("div");
     card.className = "macro-card";
@@ -391,7 +759,8 @@ function renderMacro(data) {
       <div class="macro-card-title">${item.name}</div>
       <div class="macro-card-price">${item.price.toLocaleString()}</div>
       <div class="macro-card-change ${colorClass}">
-        ${prefix}${item.pct_change}%
+        <span class="change-pts">${changePtsStr}</span>
+        <span class="change-pct">(${pctStr})</span>
       </div>
     `;
     grid.appendChild(card);
@@ -598,8 +967,42 @@ function renderActiveTabContent() {
 
   document.getElementById("tableCountBadge").textContent = `共 ${holdings.length} 檔`;
 
+  // Sort holdings according to user selection
+  function sortHoldingList(list) {
+    if (!currentSort.key || !Array.isArray(list)) return list;
+    const { key, order } = currentSort;
+    const isAsc = (order === 'asc');
+
+    return [...list].sort((a, b) => {
+      let valA = a[key];
+      let valB = b[key];
+
+      if (key === 'code') {
+        valA = String(a.code || "");
+        valB = String(b.code || "");
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'owner') {
+        valA = String(a.owner || "");
+        valB = String(b.owner || "");
+        return isAsc ? valA.localeCompare(valB, 'zh-TW') : valB.localeCompare(valA, 'zh-TW');
+      }
+      if (key === 'action_label') {
+        valA = String(a.action_label || "");
+        valB = String(b.action_label || "");
+        return isAsc ? valA.localeCompare(valB, 'zh-TW') : valB.localeCompare(valA, 'zh-TW');
+      }
+
+      valA = (valA !== undefined && valA !== null && !isNaN(valA)) ? Number(valA) : -99999999;
+      valB = (valB !== undefined && valB !== null && !isNaN(valB)) ? Number(valB) : -99999999;
+      return isAsc ? (valA - valB) : (valB - valA);
+    });
+  }
+
+  const sortedHoldings = sortHoldingList(holdings);
+
   // Render Table Rows
-  holdings.forEach((h) => {
+  sortedHoldings.forEach((h) => {
     const tr = document.createElement("tr");
     if (h.code === activeStockCode) {
       tr.classList.add("selected");
@@ -608,12 +1011,21 @@ function renderActiveTabContent() {
     const isHProfit = h.pnl >= 0;
     const pnlClass = isHProfit ? "color-up" : "color-down";
     const changeClass = h.change >= 0 ? "color-up" : "color-down";
+    const stratTag = getStockStrategyTag(h);
+    const existingNote = getStockNote(h.code);
+    const hasNote = existingNote && existingNote.note;
+    const notePreview = hasNote ? `備忘: ${existingNote.note}` : "點擊填寫個人操作策略備忘";
 
     tr.innerHTML = `
       <td>
         <div class="stock-code-cell">
           <span class="code">${h.code}</span>
-          <span class="name">${h.name}</span>
+          <div class="stock-title-badge-row">
+            <span class="name">${h.name}</span>
+            <span class="badge-stock-type ${stratTag.className}" data-term="stock_type" title="${stratTag.tooltip}">
+              ${stratTag.icon} ${stratTag.label}
+            </span>
+          </div>
         </div>
       </td>
       ${currentTab === "all" ? `<td class="td-owner"><span class="pill-info">${h.owner || '-'}</span></td>` : ""}
@@ -632,10 +1044,13 @@ function renderActiveTabContent() {
       </td>
       <td class="stock-num color-down">${h.stop_loss}</td>
       <td>
-        <button class="btn-chart-view" data-code="${h.code}">查線圖</button>
+        <button class="btn-note-view ${hasNote ? 'has-note' : ''}" data-code="${h.code}" data-name="${h.name}" title="${notePreview}">
+          📝 ${hasNote ? '備註(已填)' : '備註'}
+        </button>
       </td>
     `;
 
+    // 點擊整列開啟走勢線圖
     tr.addEventListener("click", () => {
       document.querySelectorAll("#stockTableBody tr").forEach(r => r.classList.remove("selected"));
       tr.classList.add("selected");
@@ -644,15 +1059,33 @@ function renderActiveTabContent() {
       loadStockDetail(h.code, h, true);
     });
 
+    // 點擊備註按鈕開啟備忘視窗，阻止事件冒泡！
+    const btnNote = tr.querySelector(".btn-note-view");
+    if (btnNote) {
+      btnNote.addEventListener("click", (e) => {
+        e.stopPropagation(); // 阻止開啟線圖
+        openStockNoteModal(h.code, h.name);
+      });
+    }
+
+    // 點擊特性標籤觸發小白名詞說明
+    const badgeType = tr.querySelector(".badge-stock-type");
+    if (badgeType) {
+      badgeType.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openGlossaryModal("stock_type");
+      });
+    }
+
     tbody.appendChild(tr);
   });
 
   // Store references for live cash input updates
-  window._currentHoldings = holdings;
+  window._currentHoldings = sortedHoldings;
   window._currentTotalVal = totalVal;
 
   // Render Sector Exposure & Asset Risk Management Dashboard
-  renderSectorRiskDashboard(holdings, totalVal);
+  renderSectorRiskDashboard(sortedHoldings, totalVal);
 }
 
 // Render Sector Exposure & Asset Risk Management Dashboard
@@ -835,13 +1268,22 @@ async function renderWatchlistView() {
       const s = data.stock;
       const u = data.unheld_eval;
       const changeClass = s.change >= 0 ? "color-up" : "color-down";
+      const stratTag = getStockStrategyTag(s);
+      const existingNote = getStockNote(s.code);
+      const hasNote = existingNote && existingNote.note;
+      const notePreview = hasNote ? `備忘: ${existingNote.note}` : "點擊填寫個人操作策略備忘";
 
       rowsHtml.push(`
         <tr data-code="${s.code}">
           <td>
             <div class="stock-code-cell">
               <span class="code">${s.code}</span>
-              <span class="name">${item.name || s.code}</span>
+              <div class="stock-title-badge-row">
+                <span class="name">${item.name || s.code}</span>
+                <span class="badge-stock-type ${stratTag.className}" data-term="stock_type" title="${stratTag.tooltip}">
+                  ${stratTag.icon} ${stratTag.label}
+                </span>
+              </div>
             </div>
           </td>
           <td class="stock-num">-</td>
@@ -859,7 +1301,9 @@ async function renderWatchlistView() {
           </td>
           <td class="stock-num">理想買: ${u.ideal_buy_price}</td>
           <td>
-            <button class="btn-chart-view" data-code="${s.code}">深度診斷</button>
+            <button class="btn-note-view ${hasNote ? 'has-note' : ''}" data-code="${s.code}" data-name="${item.name || s.code}" title="${notePreview}">
+              📝 ${hasNote ? '備註(已填)' : '備註'}
+            </button>
             <button class="btn-chart-view btn-remove-wl" data-code="${s.code}" title="移除觀察" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3); margin-left: 4px;">移除</button>
           </td>
         </tr>
@@ -877,6 +1321,18 @@ async function renderWatchlistView() {
         e.stopPropagation();
         const code = e.target.getAttribute("data-code");
         removeWatchlistStock(code);
+        return;
+      }
+      if (e.target.closest(".btn-note-view")) {
+        e.stopPropagation();
+        const code = tr.getAttribute("data-code");
+        const name = tr.querySelector(".name") ? tr.querySelector(".name").textContent : code;
+        openStockNoteModal(code, name);
+        return;
+      }
+      if (e.target.closest(".badge-stock-type")) {
+        e.stopPropagation();
+        openGlossaryModal("stock_type");
         return;
       }
       tbody.querySelectorAll("tr").forEach(r => r.classList.remove("selected"));
@@ -998,16 +1454,22 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
   }
 
   // Key Levels
+  const isM = (stock.timeframe === "M");
   const isW = (stock.timeframe === "W");
   const lvlMA20El = document.getElementById("lvlMA20");
   if (lvlMA20El && lvlMA20El.previousElementSibling) {
-    lvlMA20El.previousElementSibling.textContent = isW ? "20週均線：" : "20MA月線：";
+    lvlMA20El.previousElementSibling.textContent = isM ? "20月均線：" : (isW ? "20週均線：" : "20MA月線：");
   }
   lvlMA20El.textContent = stock.ma20;
   document.getElementById("lvlSupport").textContent = stock.support;
   document.getElementById("lvlResistance").textContent = stock.resistance;
   document.getElementById("lvlKD").textContent = `K: ${stock.k} / D: ${stock.d}`;
   document.getElementById("lvlRSI").textContent = `${stock.rsi} (${stock.rsi > 70 ? '過熱' : (stock.rsi < 30 ? '超賣' : '健康')})`;
+
+  const tvTfTag = document.getElementById("tvTfTag");
+  if (tvTfTag) {
+    tvTfTag.textContent = isM ? "月K" : (isW ? "週K" : "日K");
+  }
 
   // Draw Chart
   drawCandleChart(stock.candles, stock.support, stock.resistance, stock.timeframe);
@@ -1025,7 +1487,7 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
   }
 }
 
-// Background prefetch alternate timeframe (e.g. fetch Weekly while viewing Daily)
+// Background prefetch alternate timeframe (e.g. fetch Weekly/Monthly while viewing Daily)
 function prefetchAlternateTimeframe(code, targetTf) {
   if (!code) return;
   const cleanCode = String(code).trim().toUpperCase();
@@ -1083,9 +1545,9 @@ async function loadStockDetail(code, holdingContext = null, shouldOpenModal = tr
       tfBtns.forEach(b => b.classList.remove("loading"));
       renderStockDetail(cached.data, holdingContext, shouldOpenModal);
       
-      // Background prefetch the alternate timeframe
-      const altTf = (currentStockTimeframe === "D") ? "W" : "D";
-      prefetchAlternateTimeframe(cleanCode, altTf);
+      // Background prefetch the other timeframes
+      const altTfs = ["D", "W", "M"].filter(t => t !== currentStockTimeframe);
+      altTfs.forEach(t => prefetchAlternateTimeframe(cleanCode, t));
       return;
     }
   }
@@ -1093,7 +1555,13 @@ async function loadStockDetail(code, holdingContext = null, shouldOpenModal = tr
   // 2. SLOW PATH: Show immediate loading feedback & fetch from server
   if (overlay) {
     if (loaderText) {
-      loaderText.textContent = (currentStockTimeframe === "W") ? "正在載入週K走勢中..." : "正在載入日K走勢中...";
+      if (currentStockTimeframe === "M") {
+        loaderText.textContent = "正在載入月K走勢中...";
+      } else if (currentStockTimeframe === "W") {
+        loaderText.textContent = "正在載入週K走勢中...";
+      } else {
+        loaderText.textContent = "正在載入日K走勢中...";
+      }
     }
     overlay.classList.add("active");
   }
@@ -1122,9 +1590,9 @@ async function loadStockDetail(code, holdingContext = null, shouldOpenModal = tr
     // Render immediately
     renderStockDetail(result, holdingContext, shouldOpenModal);
 
-    // Prefetch alternate timeframe quietly for instant future switching
-    const altTf = (currentStockTimeframe === "D") ? "W" : "D";
-    prefetchAlternateTimeframe(cleanCode, altTf);
+    // Prefetch alternate timeframes quietly for instant future switching
+    const altTfs = ["D", "W", "M"].filter(t => t !== currentStockTimeframe);
+    altTfs.forEach(t => prefetchAlternateTimeframe(cleanCode, t));
 
   } catch (err) {
     if (err.name === "AbortError") {

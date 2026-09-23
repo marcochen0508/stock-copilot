@@ -440,7 +440,7 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
     """
     Fetch OHLCV data for Taiwan stock (auto trying .TW then .TWO),
     calculate technical indicators (MA, KD, RSI, MACD, Support, Resistance).
-    Supports Daily (interval='1d') and Weekly (interval='1wk').
+    Supports Daily (interval='1d'), Weekly (interval='1wk'), and Monthly (interval='1mo').
     """
     clean_code = str(code).strip()
     if clean_code.isdigit() and len(clean_code) < 4:
@@ -460,7 +460,7 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
             temp = t.history(period=period, interval=interval)
             if temp is not None and not temp.empty:
                 temp = temp.dropna(subset=["Close"])
-                if len(temp) >= 10:
+                if len(temp) >= 5:
                     df = temp
                     target_sym = sym
                     STOCK_EXCHANGE_MAP[clean_code] = sym
@@ -475,14 +475,14 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
     df = df.copy()
     df.index = df.index.tz_localize(None) if df.index.tz is not None else df.index
     
-    # Calculate Moving Averages
-    df["MA5"] = df["Close"].rolling(window=5).mean()
-    df["MA10"] = df["Close"].rolling(window=10).mean()
-    df["MA20"] = df["Close"].rolling(window=20).mean() # 月線生命線
-    df["MA60"] = df["Close"].rolling(window=60).mean() # 季線
+    # Calculate Moving Averages (use min_periods=1 to support shorter histories/monthly candles)
+    df["MA5"] = df["Close"].rolling(window=5, min_periods=1).mean()
+    df["MA10"] = df["Close"].rolling(window=10, min_periods=1).mean()
+    df["MA20"] = df["Close"].rolling(window=20, min_periods=1).mean() # 月線生命線
+    df["MA60"] = df["Close"].rolling(window=60, min_periods=1).mean() # 季線
     
     # Volume average
-    df["Vol_MA5"] = df["Volume"].rolling(window=5).mean()
+    df["Vol_MA5"] = df["Volume"].rolling(window=5, min_periods=1).mean()
     
     # RSI (14)
     delta = df["Close"].diff()
@@ -625,7 +625,7 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
     return {
         "symbol": target_sym,
         "code": clean_code,
-        "timeframe": "W" if interval == "1wk" else "D",
+        "timeframe": "M" if interval == "1mo" else ("W" if interval == "1wk" else "D"),
         "price": cur_price,
         "prev_price": prev_price,
         "change": change,

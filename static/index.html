@@ -230,19 +230,45 @@
           <table class="stock-table" id="stockTable">
             <thead>
               <tr>
-                <th>代號 / 名稱</th>
-                <th class="th-owner" id="thOwner">持有人</th>
-                <th>股數</th>
-                <th>成本價</th>
-                <th>目前現價</th>
-                <th>今日漲跌</th>
-                <th>未實現損益</th>
-                <th>報酬率</th>
-                <th>現金殖利率</th>
-                <th>預估年股利</th>
-                <th>智能決策</th>
-                <th>關鍵防守價</th>
-                <th>操作</th>
+                <th class="th-sortable" data-sort="code" title="點擊依代號或名稱排序">
+                  <div class="th-content"><span>代號 / 名稱</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-owner th-sortable" id="thOwner" data-sort="owner" title="點擊依持有人排序">
+                  <div class="th-content"><span>持有人</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="shares" title="點擊依股數排序">
+                  <div class="th-content"><span>股數</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="cost_price" title="點擊依成本價排序">
+                  <div class="th-content"><span>成本價</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="current_price" title="點擊依現價排序">
+                  <div class="th-content"><span>目前現價</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="change" title="點擊依今日漲跌排序">
+                  <div class="th-content"><span>今日漲跌</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="pnl" title="點擊依未實現損益排序">
+                  <div class="th-content"><span>未實現損益</span><span class="term-help" data-term="pnl" title="查看小白白話解說">❓</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="roi_pct" title="點擊依報酬率排序">
+                  <div class="th-content"><span>報酬率</span><span class="term-help" data-term="roi" title="查看小白白話解說">❓</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="dividend_yield" title="點擊依現金殖利率排序">
+                  <div class="th-content"><span>現金殖利率</span><span class="term-help" data-term="yield" title="查看小白白話解說">❓</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="est_annual_dividend" title="點擊依預估年股利排序">
+                  <div class="th-content"><span>預估年股利</span><span class="term-help" data-term="dividend" title="查看小白白話解說">❓</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="action_label" title="點擊依決策建議排序">
+                  <div class="th-content"><span>智能決策</span><span class="term-help" data-term="decision" title="查看小白白話解說">❓</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-sortable" data-sort="stop_loss" title="點擊依關鍵防守價排序">
+                  <div class="th-content"><span>關鍵防守價</span><span class="term-help" data-term="support_loss" title="查看小白白話解說">❓</span><span class="sort-icon">↕</span></div>
+                </th>
+                <th class="th-actions">
+                  <div class="th-content"><span>備註 / 待辦</span><span class="term-help" data-term="notes" title="查看功能解說">💡</span></div>
+                </th>
               </tr>
             </thead>
             <tbody id="stockTableBody">
@@ -273,6 +299,7 @@
           <div class="timeframe-selector">
             <button class="tf-btn active" data-tf="D">日K</button>
             <button class="tf-btn" data-tf="W">週K</button>
+            <button class="tf-btn" data-tf="M">月K</button>
             <button class="btn-close-stock-modal" id="btnCloseStockModal" title="關閉視窗 (可按 Esc 或點擊背景空白處)">✕ 關閉視窗 (Esc)</button>
           </div>
         </div>
@@ -435,6 +462,87 @@
           <button class="btn btn-outline" id="btnCancelSheetModal">取消</button>
           <button class="btn btn-primary" id="btnSaveSheetConfig">儲存並同步</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Stock Note / Action Plan Modal Window (每檔股票獨立備忘與待辦操作) -->
+  <div class="modal-overlay" id="stockNoteModal">
+    <div class="modal-window modal-note-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon">📝</span>
+          <div>
+            <h3 id="noteModalStockTitle">2330 台積電 · 個人操作策略與備忘</h3>
+            <span class="note-subtitle">此備忘獨立儲存在您的本機瀏覽器，換頁或重整不會遺失</span>
+          </div>
+        </div>
+        <button class="btn-close" id="btnCloseNoteModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="quick-note-tags">
+          <span class="quick-label">⚡ 快速代入策略：</span>
+          <button class="tag-pill btn-quick-note" data-insert="💰 逢低分批加碼">💰 逢低加碼</button>
+          <button class="tag-pill btn-quick-note" data-insert="🎯 達到目標價分批停利">🎯 目標價停利</button>
+          <button class="tag-pill btn-quick-note" data-insert="🛡️ 跌破防守底線果斷停損">🛡️ 破線停損</button>
+          <button class="tag-pill btn-quick-note" data-insert="🎁 穩定領息放著除權息">🎁 領息續抱</button>
+          <button class="tag-pill btn-quick-note" data-insert="👀 突破盤整區帶量再追">👀 突破再進</button>
+        </div>
+        <div class="note-textarea-box">
+          <textarea id="stockNoteTextarea" rows="6" placeholder="請填寫您對這檔股票接下來要做的事（例：預計 1020 元先賣出一半停利入袋，若拉回月線 980 元再接回；除權息前不賣安心領息...）"></textarea>
+        </div>
+        <div class="note-meta-bar">
+          <span class="note-saved-time" id="noteSavedTime">尚未儲存備忘</span>
+          <button class="btn-text-danger" id="btnClearNote">🗑️ 清空備忘</button>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-outline" id="btnCancelNoteModal">關閉</button>
+        <button class="btn btn-primary" id="btnSaveStockNote">💾 儲存備忘</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Stock Beginner Glossary Dialog (小白術語大白話百科視窗) -->
+  <div class="modal-overlay" id="glossaryModal">
+    <div class="modal-window modal-glossary-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon">📖</span>
+          <div>
+            <h3 id="glossaryTermTitle">股票小白白話辭典</h3>
+            <span class="note-subtitle">當我們是股票白癡一樣，用最直白的大白話一次看懂！</span>
+          </div>
+        </div>
+        <button class="btn-close" id="btnCloseGlossaryModal">&times;</button>
+      </div>
+      <div class="modal-body glossary-body">
+        <div class="glossary-card-hero">
+          <div class="glossary-badge" id="glossaryBadge">術語白話解說</div>
+          <h2 class="glossary-term-name" id="glossaryTermName">現金殖利率</h2>
+        </div>
+        <div class="glossary-section">
+          <div class="section-title">
+            <span class="icon">🎓</span>
+            <h4>生活白話比喻（大白話版）</h4>
+          </div>
+          <div class="glossary-text" id="glossaryPlainExplain">
+            載入中...
+          </div>
+        </div>
+        <div class="glossary-section">
+          <div class="section-title">
+            <span class="icon">💡</span>
+            <h4>實戰操作指南（看到它我該怎麼做？）</h4>
+          </div>
+          <div class="glossary-text highlight-box" id="glossaryActionAdvice">
+            載入中...
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="glossary-tip">💡 點擊網頁上任何帶有 ❓ 或底虛線的術語隨時可呼叫白話說明</span>
+        <button class="btn btn-primary" id="btnOkGlossaryModal">我知道了！</button>
       </div>
     </div>
   </div>

@@ -277,15 +277,22 @@ def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = No
         logger.error(f"Error syncing portfolios: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def get_tf_config(tf: str):
+    t = (tf or "D").upper()
+    if t == "M":
+        return "1mo", "10y"
+    elif t == "W":
+        return "1wk", "2y"
+    else:
+        return "1d", "6mo"
+
 def background_preload_stock_tf(clean_code: str, tf: str):
     """
-    Background worker to prefetch and calculate alternate timeframe (e.g. Weekly while Daily is viewed).
-    Ensures that when user clicks Day/Week switch, the response is instant (< 5ms).
+    Background worker to prefetch and calculate alternate timeframe (e.g. Weekly/Monthly).
+    Ensures that when user clicks Day/Week/Month switch, the response is instant (< 5ms).
     """
     try:
-        is_weekly = (tf.upper() == "W")
-        interval = "1wk" if is_weekly else "1d"
-        period = "2y" if is_weekly else "6mo"
+        interval, period = get_tf_config(tf)
         cache_key = f"{clean_code}_{interval}"
         now = datetime.datetime.now()
         
@@ -312,13 +319,12 @@ def background_preload_stock_tf(clean_code: str, tf: str):
 def api_stock_detail(code: str, tf: str = "D", background_tasks: BackgroundTasks = None):
     """
     Get full technical chart data, support/resistance, and unheld evaluation for any stock.
-    Supports tf='D' (日K) and tf='W' (週K).
+    Supports tf='D' (日K), tf='W' (週K), and tf='M' (月K).
     Automatically schedules background prefetching for the alternate timeframe to make switching instantaneous.
     """
     clean_code = str(code).strip().upper()
-    is_weekly = (tf.upper() == "W")
-    interval = "1wk" if is_weekly else "1d"
-    period = "2y" if is_weekly else "6mo"
+    current_tf = (tf or "D").upper()
+    interval, period = get_tf_config(current_tf)
     cache_key = f"{clean_code}_{interval}"
     
     now = datetime.datetime.now()
@@ -327,11 +333,13 @@ def api_stock_detail(code: str, tf: str = "D", background_tasks: BackgroundTasks
         
     def trigger_prefetch():
         if background_tasks:
-            other_tf = "W" if not is_weekly else "D"
-            other_interval = "1wk" if other_tf == "W" else "1d"
-            other_key = f"{clean_code}_{other_interval}"
-            if other_key not in CACHE["stocks"] or (now - CACHE["stocks"][other_key]["time"]).total_seconds() >= 600:
-                background_tasks.add_task(background_preload_stock_tf, clean_code, other_tf)
+            # Prefetch the other timeframes in background
+            alternate_tfs = [t for t in ["D", "W", "M"] if t != current_tf]
+            for alt in alternate_tfs:
+                alt_interval, _ = get_tf_config(alt)
+                alt_key = f"{clean_code}_{alt_interval}"
+                if alt_key not in CACHE["stocks"] or (now - CACHE["stocks"][alt_key]["time"]).total_seconds() >= 600:
+                    background_tasks.add_task(background_preload_stock_tf, clean_code, alt)
         
     if cache_key in CACHE["stocks"]:
         entry = CACHE["stocks"][cache_key]
