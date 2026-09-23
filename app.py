@@ -421,6 +421,12 @@ if not os.path.exists(static_dir):
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+@app.head("/")
+@app.head("/health")
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 @app.get("/")
 def read_root():
     index_path = os.path.join(static_dir, "index.html")
