@@ -267,6 +267,23 @@ def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = No
         target_sheet_id = sheet_id.strip()
 
     is_default_sheet = (target_sheet_id == sheets_sync.DEFAULT_SHEET_ID)
+
+    if not target_sheet_id:
+        return {
+            "persons": [],
+            "portfolios": {},
+            "aggregate": {
+                "total_cost": 0.0,
+                "total_market_value": 0.0,
+                "total_pnl": 0.0,
+                "total_roi_pct": 0.0,
+                "total_annual_dividend": 0.0,
+                "portfolio_yield": 0.0,
+                "holdings": []
+            },
+            "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
+        }
+
     if not force_sync and is_default_sheet and CACHE["portfolios"] and CACHE["portfolios_time"]:
         if (now - CACHE["portfolios_time"]).total_seconds() < CACHE_TTL_SECONDS:
             return CACHE["portfolios"]

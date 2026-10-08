@@ -8,12 +8,15 @@ from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SHEET_ID = "1-V4symZ1Ku_sqCDYlbvppRVVcryey5JJ7P5WE2SPZhQ"
+DEFAULT_SHEET_ID = ""
 
 def fetch_sheet_tabs_metadata(sheet_id: str = DEFAULT_SHEET_ID) -> List[Dict[str, str]]:
     """
     Dynamically discover all tabs and their gids from the public Google Sheet HTML.
     """
+    if not sheet_id:
+        return []
+
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit?usp=sharing"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
     
@@ -45,17 +48,8 @@ def fetch_sheet_tabs_metadata(sheet_id: str = DEFAULT_SHEET_ID) -> List[Dict[str
         logger.error(f"Error discovering tabs via HTML: {e}")
     
     # Fallback if dynamic discovery fails
-    if not tabs:
-        if sheet_id == DEFAULT_SHEET_ID:
-            tabs = [
-                {"name": "台北-阿良", "gid": "0"},
-                {"name": "三重-甘露涓", "gid": "1890723779"},
-                {"name": "景維", "gid": "1905018479"},
-                {"name": "阿輝", "gid": "605317612"}
-            ]
-        else:
-            # For user's custom sheet, fallback to default main sheet
-            tabs = [{"name": "持股清單", "gid": "0"}]
+    if not tabs and sheet_id:
+        tabs = [{"name": "持股清單", "gid": "0"}]
     return tabs
 
 def fetch_tab_holdings(sheet_id: str, gid: str) -> List[Dict[str, Any]]:
@@ -163,10 +157,12 @@ def fetch_tab_holdings(sheet_id: str, gid: str) -> List[Dict[str, Any]]:
     return holdings
 
 def clean_person_name(name: str) -> str:
-    """直接採用試算表的分頁名稱（例如「台北-阿良」、「三重-甘露涓」），完整保留分頁命名"""
+    """直接採用試算表的分頁名稱，完整保留分頁命名"""
     return name.strip()
 
 def get_all_sheet_portfolios(sheet_id: str = DEFAULT_SHEET_ID) -> Dict[str, Any]:
+    if not sheet_id:
+        return {}
     from concurrent.futures import ThreadPoolExecutor
     tabs = fetch_sheet_tabs_metadata(sheet_id)
     portfolios = {}
