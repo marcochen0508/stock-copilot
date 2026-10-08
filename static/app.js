@@ -20,6 +20,40 @@ let tvMa60Series = null;
 // Sector Analysis & Asset Risk Management
 let sectorDoughnutChart = null;
 
+// Source mode: 'sheets' or 'manual'
+const LS_SOURCE_MODE_KEY = "tw_source_mode_v1";
+const LS_MANUAL_HOLDINGS_KEY = "tw_manual_holdings_v1";
+const LS_MANUAL_CACHE_KEY = "tw_manual_instant_cache_v1";
+
+let currentSourceMode = localStorage.getItem(LS_SOURCE_MODE_KEY) || "sheets";
+
+// Default initial manual holdings for new users
+const DEFAULT_MANUAL_HOLDINGS = [
+  { code: "2330", name: "台積電", shares: 1000, cost_price: 950.0, owner: "我的持股", note: "核心長線" },
+  { code: "0050", name: "元大台灣50", shares: 2000, cost_price: 180.0, owner: "核心存股", note: "定期定額" },
+  { code: "2454", name: "聯發科", shares: 500, cost_price: 1250.0, owner: "波段價差", note: "季線守穩買進" }
+];
+
+function getSavedManualHoldings() {
+  try {
+    const saved = localStorage.getItem(LS_MANUAL_HOLDINGS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return DEFAULT_MANUAL_HOLDINGS;
+}
+
+function saveManualHoldings(list) {
+  try {
+    localStorage.setItem(LS_MANUAL_HOLDINGS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+let currentManualUnit = "lots"; // 'lots' or 'shares'
+let manualLookupTimer = null;
+
 const SECTOR_MAP = {
   // 半導體 / IC設計
   "2330": "半導體", "2454": "半導體", "2303": "半導體", "3037": "半導體", "2379": "半導體",
@@ -349,7 +383,8 @@ function loadFromLocalInstantCache() {
       const data = JSON.parse(rawMacro);
       renderMacro(data);
     }
-    const rawPort = localStorage.getItem(LS_PORTFOLIOS_KEY);
+    const targetKey = (currentSourceMode === "manual") ? LS_MANUAL_CACHE_KEY : LS_PORTFOLIOS_KEY;
+    const rawPort = localStorage.getItem(targetKey);
     if (rawPort) {
       const data = JSON.parse(rawPort);
       currentPortfolios = data;
@@ -357,7 +392,9 @@ function loadFromLocalInstantCache() {
       renderActiveTabContent();
       const syncStatus = document.getElementById("syncText");
       if (syncStatus) {
-        syncStatus.textContent = `🟢 已即時載入 (背景同步最新報價中...)`;
+        syncStatus.textContent = (currentSourceMode === "manual")
+          ? `🟢 已載入手動持股 (背景同步最新報價中...)`
+          : `🟢 已即時載入 (背景同步最新報價中...)`;
       }
     }
   } catch (e) {
@@ -366,10 +403,13 @@ function loadFromLocalInstantCache() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. Immediately render cached data in 0.001s so user NEVER waits
+  // 1. Initialize source mode UI & active classes
+  switchSourceMode(currentSourceMode, false);
+
+  // 2. Immediately render cached data in 0.001s so user NEVER waits
   loadFromLocalInstantCache();
-  
-  // 2. Setup listeners & fetch fresh data in background
+
+  // 3. Setup listeners & fetch fresh data in background
   initApp();
   setupEventListeners();
 });
@@ -386,6 +426,112 @@ async function initApp() {
 }
 
 function setupEventListeners() {
+    // Source mode toggle buttons
+  const btnSrcSheets = document.getElementById("btnSourceSheets");
+  const btnSrcManual = document.getElementById("btnSourceManual");
+  if (btnSrcSheets) {
+    btnSrcSheets.addEventListener("click", () => switchSourceMode("sheets", true));
+  }
+  if (btnSrcManual) {
+    btnSrcManual.addEventListener("click", () => switchSourceMode("manual", true));
+  }
+
+  // Header Manual mode action buttons
+  const btnManualAdd = document.getElementById("btnManualAddStock");
+  const btnTableAdd = document.getElementById("btnTableAddStock");
+  if (btnManualAdd) {
+    btnManualAdd.addEventListener("click", () => openManualHoldingModal());
+  }
+  if (btnTableAdd) {
+    btnTableAdd.addEventListener("click", () => openManualHoldingModal());
+  }
+
+  const btnManualRef = document.getElementById("btnManualRefresh");
+  if (btnManualRef) {
+    btnManualRef.addEventListener("click", () => loadManualPortfolioData(true));
+  }
+
+  const btnManualBkp = document.getElementById("btnManualBackup");
+  if (btnManualBkp) {
+    btnManualBkp.addEventListener("click", () => openManualBackupModal());
+  }
+
+  // Manual Holding Modal Event Handlers
+  const modalManual = document.getElementById("manualHoldingModal");
+  const btnCloseManual = document.getElementById("btnCloseManualModal");
+  const btnCancelManual = document.getElementById("btnCancelManualModal");
+  const btnSaveManual = document.getElementById("btnSaveManualHolding");
+  if (btnCloseManual) btnCloseManual.addEventListener("click", closeManualHoldingModal);
+  if (btnCancelManual) btnCancelManual.addEventListener("click", closeManualHoldingModal);
+  if (modalManual) {
+    modalManual.addEventListener("click", (e) => {
+      if (e.target === modalManual) closeManualHoldingModal();
+    });
+  }
+  if (btnSaveManual) {
+    btnSaveManual.addEventListener("click", saveManualHoldingFromForm);
+  }
+
+  // Unit toggle pills: lots vs shares
+  const btnLots = document.getElementById("btnUnitLots");
+  const btnShares = document.getElementById("btnUnitShares");
+  if (btnLots) btnLots.addEventListener("click", () => setManualUnit("lots"));
+  if (btnShares) btnShares.addEventListener("click", () => setManualUnit("shares"));
+
+  // Real-time calculation hints
+  const inputManualQty = document.getElementById("manualInputQty");
+  const inputManualCost = document.getElementById("manualInputCost");
+  if (inputManualQty) inputManualQty.addEventListener("input", updateManualQtyCostHints);
+  if (inputManualCost) inputManualCost.addEventListener("input", updateManualQtyCostHints);
+
+  // Debounced Stock Symbol Lookup
+  const inputManualCode = document.getElementById("manualInputCode");
+  if (inputManualCode) {
+    inputManualCode.addEventListener("input", (e) => {
+      clearTimeout(manualLookupTimer);
+      const val = e.target.value.trim().toUpperCase();
+      e.target.value = val;
+      manualLookupTimer = setTimeout(() => {
+        lookupStockSymbol(val);
+      }, 350);
+    });
+  }
+
+  // Manual Backup Modal Event Handlers
+  const modalBackup = document.getElementById("manualBackupModal");
+  const btnCloseBackup = document.getElementById("btnCloseBackupModal");
+  const btnCancelBackup = document.getElementById("btnCancelBackupModal");
+  const btnDlBackup = document.getElementById("btnDownloadBackupJson");
+  const btnCpBackup = document.getElementById("btnCopyBackupJson");
+  const btnSelFileImport = document.getElementById("btnSelectFileImport");
+  const inputFileBkp = document.getElementById("inputFileBackupJson");
+  const btnExecImport = document.getElementById("btnExecuteImportJson");
+
+  if (btnCloseBackup) btnCloseBackup.addEventListener("click", closeManualBackupModal);
+  if (btnCancelBackup) btnCancelBackup.addEventListener("click", closeManualBackupModal);
+  if (modalBackup) {
+    modalBackup.addEventListener("click", (e) => {
+      if (e.target === modalBackup) closeManualBackupModal();
+    });
+  }
+  if (btnDlBackup) btnDlBackup.addEventListener("click", downloadBackupJson);
+  if (btnCpBackup) btnCpBackup.addEventListener("click", copyBackupJson);
+  if (btnSelFileImport && inputFileBkp) {
+    btnSelFileImport.addEventListener("click", () => inputFileBkp.click());
+    inputFileBkp.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const textarea = document.getElementById("textareaBackupJson");
+          if (textarea) textarea.value = evt.target.result;
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+  if (btnExecImport) btnExecImport.addEventListener("click", executeImportJson);
+
   document.getElementById("btnSyncSheet").addEventListener("click", () => {
     loadPortfolioData(true);
   });
@@ -695,6 +841,387 @@ function setupEventListeners() {
   }
 }
 
+
+
+// -------------------------------------------------------------
+// 持股來源模式切換與手動持股管理核心函式
+// -------------------------------------------------------------
+function switchSourceMode(mode, reload = true) {
+  currentSourceMode = mode;
+  try {
+    localStorage.setItem(LS_SOURCE_MODE_KEY, mode);
+  } catch (e) {}
+
+  const btnSheets = document.getElementById("btnSourceSheets");
+  const btnManual = document.getElementById("btnSourceManual");
+  const sheetsActions = document.getElementById("sheetsHeaderActions");
+  const manualActions = document.getElementById("manualHeaderActions");
+  const manualTableActions = document.getElementById("manualTableActions");
+  const syncStatus = document.getElementById("syncText");
+  const syncIndicator = document.getElementById("syncIndicator");
+
+  if (mode === "manual") {
+    if (btnSheets) btnSheets.classList.remove("active");
+    if (btnManual) btnManual.classList.add("active");
+    if (sheetsActions) sheetsActions.style.display = "none";
+    if (manualActions) manualActions.style.display = "flex";
+    if (manualTableActions) manualTableActions.style.display = "flex";
+    if (syncIndicator) syncIndicator.className = "status-indicator online";
+    if (syncStatus) syncStatus.textContent = "💻 手動持股模式";
+  } else {
+    if (btnSheets) btnSheets.classList.add("active");
+    if (btnManual) btnManual.classList.remove("active");
+    if (sheetsActions) sheetsActions.style.display = "flex";
+    if (manualActions) manualActions.style.display = "none";
+    if (manualTableActions) manualTableActions.style.display = "none";
+    if (syncIndicator) syncIndicator.className = "status-indicator online";
+    if (syncStatus) syncStatus.textContent = "已連線 Google 雲端試算表";
+  }
+
+  if (reload) {
+    currentTab = "all";
+    loadPortfolioData(true);
+  }
+}
+
+function openManualHoldingModal(editingItem = null) {
+  const modal = document.getElementById("manualHoldingModal");
+  if (!modal) return;
+  const title = document.getElementById("manualHoldingModalTitle");
+  const origCode = document.getElementById("manualEditOriginalCode");
+  const origAccount = document.getElementById("manualEditOriginalAccount");
+  const inputCode = document.getElementById("manualInputCode");
+  const inputName = document.getElementById("manualInputName");
+  const inputQty = document.getElementById("manualInputQty");
+  const inputCost = document.getElementById("manualInputCost");
+  const inputAccount = document.getElementById("manualInputAccount");
+  const inputNote = document.getElementById("manualInputNote");
+  const lookupStatus = document.getElementById("manualCodeLookupStatus");
+
+  if (lookupStatus) {
+    lookupStatus.textContent = "";
+    lookupStatus.className = "lookup-status";
+  }
+
+  if (editingItem) {
+    if (title) title.textContent = `編輯持股 - ${editingItem.name || editingItem.code}`;
+    if (origCode) origCode.value = editingItem.code;
+    if (origAccount) origAccount.value = editingItem.owner || "";
+    if (inputCode) {
+      inputCode.value = editingItem.code;
+      inputCode.readOnly = true;
+    }
+    if (inputName) {
+      inputName.value = editingItem.name || "";
+      inputName.dataset.autofilled = "false";
+    }
+
+    const shares = editingItem.shares || 1000;
+    if (shares % 1000 === 0 && shares >= 1000) {
+      setManualUnit("lots");
+      if (inputQty) inputQty.value = shares / 1000;
+    } else {
+      setManualUnit("shares");
+      if (inputQty) inputQty.value = shares;
+    }
+
+    if (inputCost) inputCost.value = editingItem.cost_price || "";
+    if (inputAccount) inputAccount.value = editingItem.owner || "我的持股";
+    if (inputNote) inputNote.value = editingItem.note || "";
+  } else {
+    if (title) title.textContent = "新增手動持股";
+    if (origCode) origCode.value = "";
+    if (origAccount) origAccount.value = "";
+    if (inputCode) {
+      inputCode.value = "";
+      inputCode.readOnly = false;
+    }
+    if (inputName) {
+      inputName.value = "";
+      inputName.dataset.autofilled = "false";
+    }
+    setManualUnit("lots");
+    if (inputQty) inputQty.value = "1";
+    if (inputCost) inputCost.value = "";
+    if (inputAccount) {
+      inputAccount.value = (currentTab !== "all" && currentTab !== "watchlist") ? currentTab : "我的持股";
+    }
+    if (inputNote) inputNote.value = "";
+  }
+
+  updateManualQtyCostHints();
+  modal.classList.add("active");
+  if (!editingItem && inputCode) {
+    setTimeout(() => inputCode.focus(), 150);
+  }
+}
+
+function closeManualHoldingModal() {
+  const modal = document.getElementById("manualHoldingModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function setManualUnit(unit) {
+  currentManualUnit = unit;
+  const btnLots = document.getElementById("btnUnitLots");
+  const btnShares = document.getElementById("btnUnitShares");
+  const unitLabel = document.getElementById("manualQtyUnitLabel");
+  const inputQty = document.getElementById("manualInputQty");
+
+  if (unit === "lots") {
+    if (btnLots) btnLots.classList.add("active");
+    if (btnShares) btnShares.classList.remove("active");
+    if (unitLabel) unitLabel.textContent = "張";
+    if (inputQty) {
+      inputQty.placeholder = "例: 1";
+      inputQty.step = "any";
+    }
+  } else {
+    if (btnLots) btnLots.classList.remove("active");
+    if (btnShares) btnShares.classList.add("active");
+    if (unitLabel) unitLabel.textContent = "股";
+    if (inputQty) {
+      inputQty.placeholder = "例: 1000";
+      inputQty.step = "1";
+    }
+  }
+  updateManualQtyCostHints();
+}
+
+function updateManualQtyCostHints() {
+  const inputQty = document.getElementById("manualInputQty");
+  const inputCost = document.getElementById("manualInputCost");
+  const hintQty = document.getElementById("manualQtyCalcHint");
+  const hintCost = document.getElementById("manualCostTotalHint");
+
+  const qty = parseFloat(inputQty ? inputQty.value : 0) || 0;
+  const cost = parseFloat(inputCost ? inputCost.value : 0) || 0;
+  const totalShares = (currentManualUnit === "lots") ? Math.round(qty * 1000) : Math.round(qty);
+
+  if (hintQty) {
+    if (currentManualUnit === "lots") {
+      hintQty.textContent = `換算：${totalShares.toLocaleString()} 股`;
+    } else {
+      const lots = (totalShares / 1000).toFixed(3).replace(/\.?0+$/, "");
+      hintQty.textContent = `換算：${lots} 張 (${totalShares.toLocaleString()} 股)`;
+    }
+  }
+
+  if (hintCost) {
+    const totalInvest = Math.round(totalShares * cost);
+    hintCost.textContent = `預估總投入成本：${totalInvest > 0 ? 'NT$ ' + totalInvest.toLocaleString() : '--'} 元`;
+  }
+}
+
+async function lookupStockSymbol(code) {
+  const statusEl = document.getElementById("manualCodeLookupStatus");
+  const nameEl = document.getElementById("manualInputName");
+  const costEl = document.getElementById("manualInputCost");
+  if (!code || code.length < 2) {
+    if (statusEl) {
+      statusEl.textContent = "";
+      statusEl.className = "lookup-status";
+    }
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = "查詢中...";
+    statusEl.className = "lookup-status searching";
+  }
+
+  try {
+    const res = await fetch(`/api/stock-lookup/${encodeURIComponent(code)}`);
+    const data = await res.json();
+    if (data.found) {
+      if (nameEl && (!nameEl.value.trim() || nameEl.dataset.autofilled === "true")) {
+        nameEl.value = data.name;
+        nameEl.dataset.autofilled = "true";
+      }
+      if (costEl && !costEl.value && data.price > 0) {
+        costEl.placeholder = `參考市價: ${data.price}`;
+      }
+      if (statusEl) {
+        statusEl.textContent = `✓ ${data.name} (${data.price ? data.price + '元' : ''})`;
+        statusEl.className = "lookup-status success";
+      }
+    } else {
+      if (statusEl) {
+        statusEl.textContent = "查無此代號";
+        statusEl.className = "lookup-status error";
+      }
+    }
+  } catch (e) {
+    if (statusEl) {
+      statusEl.textContent = "";
+      statusEl.className = "lookup-status";
+    }
+  }
+}
+
+async function saveManualHoldingFromForm() {
+  const origCode = document.getElementById("manualEditOriginalCode").value.trim();
+  const origAccount = document.getElementById("manualEditOriginalAccount").value.trim();
+  const code = document.getElementById("manualInputCode").value.trim().toUpperCase();
+  const name = document.getElementById("manualInputName").value.trim() || code;
+  const qty = parseFloat(document.getElementById("manualInputQty").value) || 0;
+  const cost = parseFloat(document.getElementById("manualInputCost").value) || 0;
+  const account = document.getElementById("manualInputAccount").value.trim() || "我的持股";
+  const note = document.getElementById("manualInputNote").value.trim();
+
+  if (!code) {
+    alert("請輸入股票代號！");
+    return;
+  }
+  if (qty <= 0) {
+    alert("請輸入大於 0 的持有數量！");
+    return;
+  }
+  if (cost <= 0) {
+    alert("請輸入大於 0 的買進成本均價！");
+    return;
+  }
+
+  const shares = (currentManualUnit === "lots") ? Math.round(qty * 1000) : Math.round(qty);
+  const holdings = getSavedManualHoldings();
+
+  if (origCode) {
+    // 編輯現有項目
+    const idx = holdings.findIndex(h => h.code === origCode && (h.owner || "") === origAccount);
+    if (idx !== -1) {
+      holdings[idx] = { code, name, shares, cost_price: cost, owner: account, note };
+    } else {
+      holdings.push({ code, name, shares, cost_price: cost, owner: account, note });
+    }
+  } else {
+    // 新增項目，檢查同帳戶是否已存在
+    const existing = holdings.find(h => h.code === code && (h.owner || "我的持股") === account);
+    if (existing) {
+      if (!confirm(`帳戶「${account}」已有股票 ${code} (${existing.name}) 的持股紀錄，是否覆蓋更新？`)) {
+        return;
+      }
+      existing.name = name;
+      existing.shares = shares;
+      existing.cost_price = cost;
+      existing.note = note;
+    } else {
+      holdings.unshift({ code, name, shares, cost_price: cost, owner: account, note });
+    }
+  }
+
+  saveManualHoldings(holdings);
+  closeManualHoldingModal();
+  loadManualPortfolioData(true);
+}
+
+function deleteManualHolding(code, account = "") {
+  const holdings = getSavedManualHoldings();
+  const target = holdings.find(h => h.code === code && (h.owner || "") === account);
+  const targetName = target ? target.name : code;
+
+  if (!confirm(`確定要刪除持股【${targetName} (${code})】嗎？\n此操作無法復原。`)) {
+    return;
+  }
+
+  const updated = holdings.filter(h => !(h.code === code && (h.owner || "") === account));
+  saveManualHoldings(updated);
+  loadManualPortfolioData(true);
+}
+
+function openManualBackupModal() {
+  const modal = document.getElementById("manualBackupModal");
+  if (!modal) return;
+  const textarea = document.getElementById("textareaBackupJson");
+  const holdings = getSavedManualHoldings();
+  if (textarea) {
+    textarea.value = JSON.stringify(holdings, null, 2);
+  }
+  modal.classList.add("active");
+}
+
+function closeManualBackupModal() {
+  const modal = document.getElementById("manualBackupModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function downloadBackupJson() {
+  const holdings = getSavedManualHoldings();
+  const jsonStr = JSON.stringify(holdings, null, 2);
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `stock_copilot_holdings_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function copyBackupJson() {
+  const holdings = getSavedManualHoldings();
+  const jsonStr = JSON.stringify(holdings, null, 2);
+  navigator.clipboard.writeText(jsonStr).then(() => {
+    alert("持股 JSON 備份內容已複製到剪貼簿！");
+  }).catch(() => {
+    const textarea = document.getElementById("textareaBackupJson");
+    if (textarea) {
+      textarea.select();
+      document.execCommand("copy");
+      alert("持股 JSON 備份內容已複製到剪貼簿！");
+    }
+  });
+}
+
+function executeImportJson() {
+  const textarea = document.getElementById("textareaBackupJson");
+  if (!textarea || !textarea.value.trim()) {
+    alert("請先貼上或選擇 JSON 備份檔案內容！");
+    return;
+  }
+
+  try {
+    const data = JSON.parse(textarea.value.trim());
+    let list = null;
+    if (Array.isArray(data)) {
+      list = data;
+    } else if (data.holdings && Array.isArray(data.holdings)) {
+      list = data.holdings;
+    }
+
+    if (!list || list.length === 0) {
+      alert("格式錯誤：備份內容必須包含有效的股票清單陣列！");
+      return;
+    }
+
+    const validList = list.filter(item => item && item.code && (item.shares > 0 || item.qty > 0)).map(item => ({
+      code: String(item.code).trim().toUpperCase(),
+      name: item.name ? String(item.name).trim() : String(item.code).trim(),
+      shares: Number(item.shares || (item.qty ? item.qty * 1000 : 1000)),
+      cost_price: Number(item.cost_price || item.cost || 0),
+      owner: item.owner ? String(item.owner).trim() : "我的持股",
+      note: item.note ? String(item.note).trim() : ""
+    }));
+
+    if (validList.length === 0) {
+      alert("未能在匯入資料中找到有效的持股紀錄（每筆需有股票代號與股數）。");
+      return;
+    }
+
+    if (!confirm(`成功解析 ${validList.length} 檔持股，是否確定匯入並覆蓋目前手動持股？`)) {
+      return;
+    }
+
+    saveManualHoldings(validList);
+    closeManualBackupModal();
+    loadManualPortfolioData(true);
+    alert(`成功匯入 ${validList.length} 檔持股！`);
+  } catch (err) {
+    alert(`JSON 解析失敗：${err.message}`);
+  }
+}
+
 function addNewWatchlistStock(code, name = null) {
   const cleanCode = code.trim().toUpperCase();
   if (watchlistStocks.some(s => s.code === cleanCode)) {
@@ -769,7 +1296,17 @@ function renderMacro(data) {
 }
 
 // Load Portfolio Data from Google Sheets
+// Unified Portfolio Loader (Routes to Sheets or Manual mode)
 async function loadPortfolioData(forceSync = false) {
+  if (currentSourceMode === "manual") {
+    return await loadManualPortfolioData(forceSync);
+  } else {
+    return await loadSheetsPortfolioData(forceSync);
+  }
+}
+
+// Load Portfolio Data from Google Sheets
+async function loadSheetsPortfolioData(forceSync = false) {
   const syncStatus = document.getElementById("syncText");
   const btnSync = document.getElementById("btnSyncSheet");
   if (forceSync) {
@@ -799,6 +1336,38 @@ async function loadPortfolioData(forceSync = false) {
     console.error("Error loading portfolios:", err);
   } finally {
     btnSync.classList.remove("loading");
+  }
+}
+
+// Load and Calculate Portfolio Data from Local Manual Holdings
+async function loadManualPortfolioData(forceSync = false) {
+  const syncStatus = document.getElementById("syncText");
+  const btnRefresh = document.getElementById("btnManualRefresh");
+  if (btnRefresh && forceSync) btnRefresh.classList.add("loading");
+  if (syncStatus) syncStatus.textContent = "正在計算手動持股即時報價與健康診斷...";
+
+  const holdings = getSavedManualHoldings();
+
+  try {
+    const res = await fetch("/api/portfolios/calculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holdings: holdings })
+    });
+    const data = await res.json();
+    currentPortfolios = data;
+    try {
+      localStorage.setItem(LS_MANUAL_CACHE_KEY, JSON.stringify(data));
+    } catch(e) {}
+    const timeStr = data.synced_at ? (data.synced_at.split(' ')[1] || data.synced_at) : new Date().toLocaleTimeString();
+    if (syncStatus) syncStatus.textContent = `🟢 手動持股模式 (更新: ${timeStr})`;
+    renderPersonTabs();
+    renderActiveTabContent();
+  } catch (err) {
+    if (syncStatus) syncStatus.textContent = "手動持股報價更新失敗";
+    console.error("Error calculating manual portfolios:", err);
+  } finally {
+    if (btnRefresh) btnRefresh.classList.remove("loading");
   }
 }
 
@@ -911,9 +1480,9 @@ function renderActiveTabContent() {
   let portfolioYield = 0;
   let holdings = [];
 
-  if (currentTab === "all") {
+    if (currentTab === "all") {
     thOwner.style.display = "";
-    document.getElementById("tableSectionTitle").textContent = "家族全部合併持股體檢總覽";
+    document.getElementById("tableSectionTitle").textContent = (currentSourceMode === "manual") ? "手動持股健康體檢總覽" : "家族全部合併持股體檢總覽";
     const agg = currentPortfolios.aggregate;
     totalCost = agg.total_cost;
     totalVal = agg.total_market_value;
@@ -924,9 +1493,14 @@ function renderActiveTabContent() {
     holdings = agg.holdings;
 
     if (bannerTitle) {
-      const personListStr = currentPortfolios.persons ? currentPortfolios.persons.join("、") : "";
-      const personCount = currentPortfolios.persons ? currentPortfolios.persons.length : 0;
-      bannerTitle.textContent = `【全部合併總覽】包含 ${personListStr} 共 ${personCount} 個帳戶（合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，每年預估股利 NT$ ${totalAnnualDiv.toLocaleString()} 元）`;
+      if (currentSourceMode === "manual") {
+        const isProfit = totalPnL >= 0;
+        bannerTitle.textContent = `【手動持股總覽】合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，目前損益: ${isProfit ? '+' : ''}NT$ ${totalPnL.toLocaleString()} 元 / ${isProfit ? '+' : ''}${totalROI}%，預估年領股利 NT$ ${totalAnnualDiv.toLocaleString()} 元`;
+      } else {
+        const personListStr = currentPortfolios.persons ? currentPortfolios.persons.join("、") : "";
+        const personCount = currentPortfolios.persons ? currentPortfolios.persons.length : 0;
+        bannerTitle.textContent = `【全部合併總覽】包含 ${personListStr} 共 ${personCount} 個帳戶（合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，每年預估股利 NT$ ${totalAnnualDiv.toLocaleString()} 元）`;
+      }
     }
   } else {
     thOwner.style.display = "none";
@@ -1043,11 +1617,17 @@ function renderActiveTabContent() {
           ${h.action_label}
         </span>
       </td>
-      <td class="stock-num color-down">${h.stop_loss}</td>
+            <td class="stock-num color-down">${h.stop_loss}</td>
       <td>
-        <button class="btn-note-view ${hasNote ? 'has-note' : ''}" data-code="${h.code}" data-name="${h.name}" title="${notePreview}">
-          📝 ${hasNote ? '備註(已填)' : '備註'}
-        </button>
+        <div class="row-actions-wrap" style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+          <button class="btn-note-view ${hasNote ? 'has-note' : ''}" data-code="${h.code}" data-name="${h.name}" title="${notePreview}">
+            📝 ${hasNote ? '備註(已填)' : '備註'}
+          </button>
+          ${currentSourceMode === "manual" ? `
+            <button class="btn-row-action btn-row-edit" data-code="${h.code}" data-owner="${h.owner || ''}" title="編輯此筆持股">✏️</button>
+            <button class="btn-row-action btn-row-delete" data-code="${h.code}" data-owner="${h.owner || ''}" title="刪除此筆持股">🗑️</button>
+          ` : ""}
+        </div>
       </td>
     `;
 
@@ -1069,7 +1649,7 @@ function renderActiveTabContent() {
       });
     }
 
-    // 點擊特性標籤觸發小白名詞說明
+        // 點擊特性標籤觸發小白名詞說明
     const badgeType = tr.querySelector(".badge-stock-type");
     if (badgeType) {
       badgeType.addEventListener("click", (e) => {
@@ -1078,8 +1658,44 @@ function renderActiveTabContent() {
       });
     }
 
+    // 手動模式專屬：編輯與刪除按鈕監聽
+    if (currentSourceMode === "manual") {
+      const btnEdit = tr.querySelector(".btn-row-edit");
+      if (btnEdit) {
+        btnEdit.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const targetHoldings = getSavedManualHoldings();
+          const item = targetHoldings.find(x => x.code === h.code && (x.owner || "") === (h.owner || ""));
+          openManualHoldingModal(item || h);
+        });
+      }
+      const btnDel = tr.querySelector(".btn-row-delete");
+      if (btnDel) {
+        btnDel.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteManualHolding(h.code, h.owner || "");
+        });
+      }
+    }
+
     tbody.appendChild(tr);
   });
+
+  // 手動持股為空時的友善引導
+  if (sortedHoldings.length === 0 && currentSourceMode === "manual") {
+    const emptyTr = document.createElement("tr");
+    emptyTr.innerHTML = `
+      <td colspan="${currentTab === 'all' ? 13 : 12}" style="text-align: center; padding: 48px 16px;">
+        <div style="font-size: 2.2rem; margin-bottom: 10px;">💼</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">目前尚無手動持股紀錄</div>
+        <div style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 18px;">點擊下方按鈕新增第一筆持股，即刻啟用零延遲即時報價與完整量化體檢</div>
+        <button class="btn btn-primary" id="btnEmptyAddHolding">➕ 新增第一筆持股</button>
+      </td>
+    `;
+    const btnEmpty = emptyTr.querySelector("#btnEmptyAddHolding");
+    if (btnEmpty) btnEmpty.addEventListener("click", () => openManualHoldingModal());
+    tbody.appendChild(emptyTr);
+  }
 
   // Store references for live cash input updates
   window._currentHoldings = sortedHoldings;

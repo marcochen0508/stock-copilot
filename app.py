@@ -80,9 +80,181 @@ def api_macro(force: bool = False):
             return CACHE["macro"]
         raise HTTPException(status_code=500, detail=str(e))
 
+def enrich_raw_portfolios(raw_portfolios: Dict[str, Any]) -> Dict[str, Any]:
+    from concurrent.futures import ThreadPoolExecutor
+    now = datetime.datetime.now()
+
+    # 1. Gather all unique stock codes
+    unique_codes = set()
+    for person, data in raw_portfolios.items():
+        for h in data.get("holdings", []):
+            code_str = str(h.get("code", "")).strip()
+            if code_str:
+                unique_codes.add(code_str)
+            
+    # 2. Fetch 0-latency live quotes from official TWSE MIS in 1 bulk request (~0.1s)
+    mis_quotes = {}
+    try:
+        mis_quotes = market_engine.get_twse_mis_realtime_batch(list(unique_codes))
+    except Exception as ex:
+        logger.warning(f"Could not batch fetch TWSE MIS quotes: {ex}")
+            
+    # 3. Fetch stock quotes & indicators concurrently in parallel
+    stock_cache_map = {}
+    def _fetch_stock_data(c):
+        return c, market_engine.get_stock_history_and_indicators(c)
+        
+    with ThreadPoolExecutor(max_workers=min(len(unique_codes) or 1, 8)) as executor:
+        results = executor.map(_fetch_stock_data, list(unique_codes))
+        for code, s_data in results:
+            if s_data and code in mis_quotes:
+                rt = mis_quotes[code]
+                s_data["price"] = rt["price"]
+                s_data["prev_price"] = rt["prev_price"]
+                s_data["change"] = rt["change"]
+                s_data["pct_change"] = rt["pct_change"]
+                if rt["volume"] > 0:
+                    s_data["volume"] = rt["volume"]
+                s_data["is_realtime"] = True
+            stock_cache_map[code] = s_data
+
+    enriched_portfolios = {}
+    all_holdings = []
+    
+    for person, data in raw_portfolios.items():
+        enriched_items = []
+        tab_total_cost = 0.0
+        tab_total_val = 0.0
+        tab_total_annual_div = 0.0
+        
+        for h in data.get("holdings", []):
+            code = str(h.get("code", "")).strip()
+            if not code:
+                continue
+            shares = float(h.get("shares", 0))
+            cost = float(h.get("cost_price", 0))
+            name = h.get("name") or (mis_quotes.get(code, {}).get("name") if code in mis_quotes else code)
+            note = h.get("note", "")
+            
+            # Fetch stock quote & indicators from memory cache
+            stock_data = stock_cache_map.get(code)
+            if stock_data:
+                diag = market_engine.diagnose_stock_holding(stock_data, cost, shares)
+                market_val = round(stock_data["price"] * shares, 0)
+                total_c = round(cost * shares, 0)
+                annual_div = stock_data.get("annual_dividend", 0.0)
+                div_yield = stock_data.get("dividend_yield", 0.0)
+                est_annual_div = round(annual_div * shares, 0)
+                
+                item = {
+                    "code": code,
+                    "name": name,
+                    "shares": shares,
+                    "cost_price": cost,
+                    "current_price": stock_data["price"],
+                    "prev_price": stock_data["prev_price"],
+                    "change": stock_data["change"],
+                    "pct_change": stock_data["pct_change"],
+                    "total_cost": total_c,
+                    "market_value": market_val,
+                    "pnl": diag["pnl"],
+                    "roi_pct": diag["roi_pct"],
+                    "action_label": diag["action_label"],
+                    "action_type": diag["action_type"],
+                    "action_color": diag["action_color"],
+                    "stop_loss": diag["stop_loss"],
+                    "target_price": diag["target_price"],
+                    "guidance": diag["guidance"],
+                    "caution": diag["caution"],
+                    "annual_dividend": annual_div,
+                    "dividend_yield": div_yield,
+                    "est_annual_dividend": est_annual_div,
+                    "ma20": stock_data["ma20"],
+                    "support": stock_data["support"],
+                    "resistance": stock_data["resistance"],
+                    "bias20": stock_data["bias20"],
+                    "k": stock_data["k"],
+                    "d": stock_data["d"],
+                    "rsi": stock_data["rsi"],
+                    "vol_ratio": stock_data["vol_ratio"],
+                    "note": note
+                }
+                tab_total_cost += total_c
+                tab_total_val += market_val
+                tab_total_annual_div += est_annual_div
+            else:
+                # Fallback if quote failed
+                item = {
+                    "code": code,
+                    "name": name,
+                    "shares": shares,
+                    "cost_price": cost,
+                    "current_price": cost,
+                    "prev_price": cost,
+                    "change": 0.0,
+                    "pct_change": 0.0,
+                    "total_cost": cost * shares,
+                    "market_value": cost * shares,
+                    "pnl": 0.0,
+                    "roi_pct": 0.0,
+                    "action_label": "資料載入中",
+                    "action_type": "NEUTRAL",
+                    "action_color": "#94a3b8",
+                    "stop_loss": cost * 0.93,
+                    "target_price": cost * 1.1,
+                    "guidance": "等待數據連線",
+                    "caution": "-",
+                    "annual_dividend": 0.0,
+                    "dividend_yield": 0.0,
+                    "est_annual_dividend": 0.0,
+                    "note": note
+                }
+                tab_total_cost += cost * shares
+                tab_total_val += cost * shares
+                
+            enriched_items.append(item)
+            all_holdings.append({**item, "owner": person})
+            
+        tab_pnl = tab_total_val - tab_total_cost
+        tab_roi = (tab_pnl / tab_total_cost * 100) if tab_total_cost > 0 else 0.0
+        
+        enriched_portfolios[person] = {
+            "name": person,
+            "gid": data.get("gid", ""),
+            "total_cost": round(tab_total_cost, 0),
+            "total_market_value": round(tab_total_val, 0),
+            "total_pnl": round(tab_pnl, 0),
+            "total_roi_pct": round(tab_roi, 2),
+            "total_annual_dividend": round(tab_total_annual_div, 0),
+            "portfolio_yield": round((tab_total_annual_div / tab_total_val * 100), 2) if tab_total_val > 0 else 0.0,
+            "holdings": enriched_items
+        }
+        
+    # Aggregate '全部合併總覽'
+    agg_cost = sum(p["total_cost"] for p in enriched_portfolios.values())
+    agg_val = sum(p["total_market_value"] for p in enriched_portfolios.values())
+    agg_div = sum(p["total_annual_dividend"] for p in enriched_portfolios.values())
+    agg_pnl = agg_val - agg_cost
+    agg_roi = (agg_pnl / agg_cost * 100) if agg_cost > 0 else 0.0
+    agg_yield = round((agg_div / agg_val * 100), 2) if agg_val > 0 else 0.0
+    
+    return {
+        "persons": list(enriched_portfolios.keys()),
+        "portfolios": enriched_portfolios,
+        "aggregate": {
+            "total_cost": round(agg_cost, 0),
+            "total_market_value": round(agg_val, 0),
+            "total_pnl": round(agg_pnl, 0),
+            "total_roi_pct": round(agg_roi, 2),
+            "total_annual_dividend": round(agg_div, 0),
+            "portfolio_yield": agg_yield,
+            "holdings": all_holdings
+        },
+        "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
 @app.get("/api/portfolios")
 def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = None, force_sync: bool = False):
-    from concurrent.futures import ThreadPoolExecutor
     import re
     now = datetime.datetime.now()
     
@@ -101,167 +273,7 @@ def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = No
             
     try:
         raw_portfolios = sheets_sync.get_all_sheet_portfolios(sheet_id=target_sheet_id)
-        
-        # 1. Gather all unique stock codes
-        unique_codes = set()
-        for person, data in raw_portfolios.items():
-            for h in data.get("holdings", []):
-                unique_codes.add(h["code"])
-                
-        # 2. Fetch 0-latency live quotes from official TWSE MIS in 1 bulk request (~0.1s)
-        mis_quotes = {}
-        try:
-            mis_quotes = market_engine.get_twse_mis_realtime_batch(list(unique_codes))
-        except Exception as ex:
-            logger.warning(f"Could not batch fetch TWSE MIS quotes: {ex}")
-                
-        # 3. Fetch stock quotes & indicators concurrently in parallel
-        stock_cache_map = {}
-        def _fetch_stock_data(c):
-            return c, market_engine.get_stock_history_and_indicators(c)
-            
-        with ThreadPoolExecutor(max_workers=min(len(unique_codes) or 1, 8)) as executor:
-            results = executor.map(_fetch_stock_data, list(unique_codes))
-            for code, s_data in results:
-                if s_data and code in mis_quotes:
-                    rt = mis_quotes[code]
-                    s_data["price"] = rt["price"]
-                    s_data["prev_price"] = rt["prev_price"]
-                    s_data["change"] = rt["change"]
-                    s_data["pct_change"] = rt["pct_change"]
-                    if rt["volume"] > 0:
-                        s_data["volume"] = rt["volume"]
-                    s_data["is_realtime"] = True
-                stock_cache_map[code] = s_data
-
-        enriched_portfolios = {}
-        all_holdings = []
-        
-        for person, data in raw_portfolios.items():
-            enriched_items = []
-            tab_total_cost = 0.0
-            tab_total_val = 0.0
-            tab_total_annual_div = 0.0
-            
-            for h in data.get("holdings", []):
-                code = h["code"]
-                shares = h["shares"]
-                cost = h["cost_price"]
-                
-                # Fetch stock quote & indicators from memory cache
-                stock_data = stock_cache_map.get(code)
-                if stock_data:
-                    diag = market_engine.diagnose_stock_holding(stock_data, cost, shares)
-                    market_val = round(stock_data["price"] * shares, 0)
-                    total_c = round(cost * shares, 0)
-                    annual_div = stock_data.get("annual_dividend", 0.0)
-                    div_yield = stock_data.get("dividend_yield", 0.0)
-                    est_annual_div = round(annual_div * shares, 0)
-                    
-                    item = {
-                        "code": code,
-                        "name": h["name"],
-                        "shares": shares,
-                        "cost_price": cost,
-                        "current_price": stock_data["price"],
-                        "prev_price": stock_data["prev_price"],
-                        "change": stock_data["change"],
-                        "pct_change": stock_data["pct_change"],
-                        "total_cost": total_c,
-                        "market_value": market_val,
-                        "pnl": diag["pnl"],
-                        "roi_pct": diag["roi_pct"],
-                        "action_label": diag["action_label"],
-                        "action_type": diag["action_type"],
-                        "action_color": diag["action_color"],
-                        "stop_loss": diag["stop_loss"],
-                        "target_price": diag["target_price"],
-                        "guidance": diag["guidance"],
-                        "caution": diag["caution"],
-                        "annual_dividend": annual_div,
-                        "dividend_yield": div_yield,
-                        "est_annual_dividend": est_annual_div,
-                        "ma20": stock_data["ma20"],
-                        "support": stock_data["support"],
-                        "resistance": stock_data["resistance"],
-                        "bias20": stock_data["bias20"],
-                        "k": stock_data["k"],
-                        "d": stock_data["d"],
-                        "rsi": stock_data["rsi"],
-                        "vol_ratio": stock_data["vol_ratio"]
-                    }
-                    tab_total_cost += total_c
-                    tab_total_val += market_val
-                    tab_total_annual_div += est_annual_div
-                else:
-                    # Fallback if quote failed
-                    item = {
-                        "code": code,
-                        "name": h["name"],
-                        "shares": shares,
-                        "cost_price": cost,
-                        "current_price": cost,
-                        "prev_price": cost,
-                        "change": 0.0,
-                        "pct_change": 0.0,
-                        "total_cost": cost * shares,
-                        "market_value": cost * shares,
-                        "pnl": 0.0,
-                        "roi_pct": 0.0,
-                        "action_label": "資料載入中",
-                        "action_type": "NEUTRAL",
-                        "action_color": "#94a3b8",
-                        "stop_loss": cost * 0.93,
-                        "target_price": cost * 1.1,
-                        "guidance": "等待數據連線",
-                        "caution": "-",
-                        "annual_dividend": 0.0,
-                        "dividend_yield": 0.0,
-                        "est_annual_dividend": 0.0
-                    }
-                    tab_total_cost += cost * shares
-                    tab_total_val += cost * shares
-                    
-                enriched_items.append(item)
-                all_holdings.append({**item, "owner": person})
-                
-            tab_pnl = tab_total_val - tab_total_cost
-            tab_roi = (tab_pnl / tab_total_cost * 100) if tab_total_cost > 0 else 0.0
-            
-            enriched_portfolios[person] = {
-                "name": person,
-                "gid": data.get("gid"),
-                "total_cost": round(tab_total_cost, 0),
-                "total_market_value": round(tab_total_val, 0),
-                "total_pnl": round(tab_pnl, 0),
-                "total_roi_pct": round(tab_roi, 2),
-                "total_annual_dividend": round(tab_total_annual_div, 0),
-                "portfolio_yield": round((tab_total_annual_div / tab_total_val * 100), 2) if tab_total_val > 0 else 0.0,
-                "holdings": enriched_items
-            }
-            
-        # Aggregate '全部合併總覽'
-        agg_cost = sum(p["total_cost"] for p in enriched_portfolios.values())
-        agg_val = sum(p["total_market_value"] for p in enriched_portfolios.values())
-        agg_div = sum(p["total_annual_dividend"] for p in enriched_portfolios.values())
-        agg_pnl = agg_val - agg_cost
-        agg_roi = (agg_pnl / agg_cost * 100) if agg_cost > 0 else 0.0
-        agg_yield = round((agg_div / agg_val * 100), 2) if agg_val > 0 else 0.0
-        
-        result = {
-            "persons": list(enriched_portfolios.keys()),
-            "portfolios": enriched_portfolios,
-            "aggregate": {
-                "total_cost": round(agg_cost, 0),
-                "total_market_value": round(agg_val, 0),
-                "total_pnl": round(agg_pnl, 0),
-                "total_roi_pct": round(agg_roi, 2),
-                "total_annual_dividend": round(agg_div, 0),
-                "portfolio_yield": agg_yield,
-                "holdings": all_holdings
-            },
-            "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
-        }
+        result = enrich_raw_portfolios(raw_portfolios)
         
         CACHE["portfolios"] = result
         CACHE["portfolios_time"] = now
@@ -276,6 +288,81 @@ def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = No
     except Exception as e:
         logger.error(f"Error syncing portfolios: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/portfolios/calculate")
+def api_portfolios_calculate(payload: Dict[str, Any]):
+    """
+    Calculate real-time portfolio metrics for user-submitted holdings (manual input mode).
+    Payload format:
+    {
+       "holdings": [
+           {"code": "2330", "name": "台積電", "shares": 1000, "cost_price": 950.0, "account": "我的持股", "note": ""}
+       ]
+    }
+    or
+    {
+       "portfolios": {
+           "我的持股": { "holdings": [...] }
+       }
+    }
+    """
+    try:
+        raw_portfolios = {}
+        if "holdings" in payload and isinstance(payload["holdings"], list):
+            for item in payload["holdings"]:
+                acct = str(item.get("account") or item.get("owner") or "我的持股").strip()
+                if not acct:
+                    acct = "我的持股"
+                if acct not in raw_portfolios:
+                    raw_portfolios[acct] = {"gid": "manual", "holdings": []}
+                raw_portfolios[acct]["holdings"].append({
+                    "code": str(item.get("code", "")).strip(),
+                    "name": str(item.get("name", "")).strip(),
+                    "shares": float(item.get("shares", 0)),
+                    "cost_price": float(item.get("cost_price", 0)),
+                    "note": str(item.get("note", ""))
+                })
+        elif "portfolios" in payload and isinstance(payload["portfolios"], dict):
+            raw_portfolios = payload["portfolios"]
+
+        if not raw_portfolios:
+            raw_portfolios = {"我的持股": {"gid": "manual", "holdings": []}}
+
+        return enrich_raw_portfolios(raw_portfolios)
+    except Exception as e:
+        logger.error(f"Error calculating manual portfolios: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/stock-lookup/{code}")
+def api_stock_lookup(code: str):
+    """
+    Quick stock symbol resolution for auto-populating stock name and current price.
+    """
+    clean_code = str(code).strip()
+    try:
+        mis = market_engine.get_twse_mis_realtime_batch([clean_code])
+        if clean_code in mis:
+            return {
+                "found": True,
+                "code": clean_code,
+                "name": mis[clean_code].get("name", clean_code),
+                "price": mis[clean_code].get("price", 0),
+                "change": mis[clean_code].get("change", 0),
+                "pct_change": mis[clean_code].get("pct_change", 0)
+            }
+        data = market_engine.get_stock_history_and_indicators(clean_code)
+        if data:
+            return {
+                "found": True,
+                "code": clean_code,
+                "name": data.get("name", clean_code),
+                "price": data.get("price", 0),
+                "change": data.get("change", 0),
+                "pct_change": data.get("pct_change", 0)
+            }
+    except Exception as e:
+        logger.warning(f"Stock lookup error for {clean_code}: {e}")
+    return {"found": False, "code": clean_code, "name": clean_code, "price": 0, "change": 0, "pct_change": 0}
 
 def get_tf_config(tf: str):
     t = (tf or "D").upper()

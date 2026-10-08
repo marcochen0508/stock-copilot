@@ -37,18 +37,49 @@
       </div>
     </div>
     <div class="header-right">
+      <!-- 持股來源切換開關 -->
+      <div class="source-toggle-group" id="sourceToggleGroup" title="切換持股來源模式">
+        <button class="source-toggle-btn active" id="btnSourceSheets">
+          <span class="source-icon">☁️</span>
+          <span>Google 試算表</span>
+        </button>
+        <button class="source-toggle-btn" id="btnSourceManual">
+          <span class="source-icon">💻</span>
+          <span>手動輸入持股</span>
+        </button>
+      </div>
+
       <div class="sync-status" id="syncStatus">
-        <span class="status-indicator online"></span>
+        <span class="status-indicator online" id="syncIndicator"></span>
         <span class="sync-text" id="syncText">已連線 Google 雲端試算表</span>
       </div>
-      <button class="btn btn-outline" id="btnSyncSheet" title="同步 Google 試算表最新持股">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-        <span>同步試算表</span>
-      </button>
-      <button class="btn btn-outline" id="btnConfigSheet" title="設定或更換個人 Google 試算表網址">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span>更換試算表</span>
-      </button>
+
+      <!-- 雲端試算表專屬操作按鈕群 -->
+      <div class="header-actions-group" id="sheetsHeaderActions">
+        <button class="btn btn-outline" id="btnSyncSheet" title="同步 Google 試算表最新持股">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>同步試算表</span>
+        </button>
+        <button class="btn btn-outline" id="btnConfigSheet" title="設定或更換個人 Google 試算表網址">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>更換試算表</span>
+        </button>
+      </div>
+
+      <!-- 手動輸入專屬操作按鈕群 -->
+      <div class="header-actions-group" id="manualHeaderActions" style="display: none;">
+        <button class="btn btn-primary" id="btnManualAddStock" title="新增一筆持股">
+          <span class="icon">➕</span>
+          <span>新增持股</span>
+        </button>
+        <button class="btn btn-outline" id="btnManualRefresh" title="重新整理即時行情">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>更新行情</span>
+        </button>
+        <button class="btn btn-outline" id="btnManualBackup" title="備份或匯入持股資料">
+          <span>📤 備份/匯入</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -213,8 +244,13 @@
       <!-- Left / Top: Stock Holdings Table / Watchlist -->
       <div class="table-section-card">
         <div class="card-section-header">
-          <h3 id="tableSectionTitle">持股健康度與個人化決策清單</h3>
-          <span class="pill-info" id="tableCountBadge">共 0 檔</span>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <h3 id="tableSectionTitle">持股健康度與個人化決策清單</h3>
+            <span class="pill-info" id="tableCountBadge">共 0 檔</span>
+          </div>
+          <div class="table-actions-right" id="manualTableActions" style="display: none;">
+            <button class="btn btn-primary btn-sm" id="btnTableAddStock">➕ 新增持股</button>
+          </div>
         </div>
 
         <!-- Interactive Watchlist Manager Toolbar (visible only on watchlist tab) -->
@@ -602,6 +638,133 @@
           <button class="btn btn-outline" id="btnCancelSheetModal">取消</button>
           <button class="btn btn-primary" id="btnSaveSheetConfig">儲存並同步</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Manual Holding Add/Edit Modal (手動新增/編輯持股視窗) -->
+  <div class="modal-overlay" id="manualHoldingModal">
+    <div class="modal-window modal-manual-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon">💼</span>
+          <div>
+            <h3 id="manualHoldingModalTitle">新增手動持股</h3>
+            <span class="note-subtitle">記錄持股成本與股數，同步享有零延遲即時報價與完整量化診斷</span>
+          </div>
+        </div>
+        <button class="btn-close" id="btnCloseManualModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formManualHolding" onsubmit="return false;">
+          <input type="hidden" id="manualEditOriginalCode" value="">
+          <input type="hidden" id="manualEditOriginalAccount" value="">
+
+          <div class="modal-form-grid">
+            <div class="form-group">
+              <label for="manualInputCode">股票代號 <span class="required">*</span></label>
+              <div class="input-with-lookup">
+                <input type="text" id="manualInputCode" placeholder="例: 2330、0050、2603" maxlength="10" required autocomplete="off">
+                <span class="lookup-status" id="manualCodeLookupStatus"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="manualInputName">股票名稱</label>
+              <input type="text" id="manualInputName" placeholder="輸入代號自動代入" autocomplete="off">
+            </div>
+          </div>
+
+          <!-- Unit Selector: 張數 vs 股數 -->
+          <div class="modal-form-grid" style="margin-top: 14px;">
+            <div class="form-group">
+              <div class="unit-toggle-header">
+                <label for="manualInputQty">持有數量 <span class="required">*</span></label>
+                <div class="unit-pill-selector">
+                  <button type="button" class="unit-pill active" id="btnUnitLots" data-unit="lots">張數 (1張=1000股)</button>
+                  <button type="button" class="unit-pill" id="btnUnitShares" data-unit="shares">股數 (零股/整股)</button>
+                </div>
+              </div>
+              <div class="input-with-unit">
+                <input type="number" id="manualInputQty" placeholder="例: 1" step="any" min="0.001" required>
+                <span class="unit-label" id="manualQtyUnitLabel">張</span>
+              </div>
+              <div class="qty-calc-hint" id="manualQtyCalcHint">換算：1,000 股</div>
+            </div>
+
+            <div class="form-group">
+              <label for="manualInputCost">買進成本均價 (元/每股) <span class="required">*</span></label>
+              <div class="input-with-unit">
+                <input type="number" id="manualInputCost" placeholder="例: 950.0" step="any" min="0.01" required>
+                <span class="unit-label">元</span>
+              </div>
+              <div class="qty-calc-hint" id="manualCostTotalHint">預估總投入成本：-- 元</div>
+            </div>
+          </div>
+
+          <div class="modal-form-grid" style="margin-top: 14px;">
+            <div class="form-group">
+              <label for="manualInputAccount">歸屬帳戶 / 分組標籤</label>
+              <input type="text" id="manualInputAccount" value="我的持股" placeholder="例: 我的持股、存股帳戶、波段操作" list="accountSuggestions">
+              <datalist id="accountSuggestions">
+                <option value="我的持股">
+                <option value="核心存股">
+                <option value="波段價差">
+              </datalist>
+            </div>
+            <div class="form-group">
+              <label for="manualInputNote">操作備註 (選填)</label>
+              <input type="text" id="manualInputNote" placeholder="例: 除權息前買進、破季線防守" autocomplete="off">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-outline" id="btnCancelManualModal">取消</button>
+        <button type="button" class="btn btn-primary" id="btnSaveManualHolding">💾 儲存持股</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Manual Backup / Import Modal (持股資料備份與還原視窗) -->
+  <div class="modal-overlay" id="manualBackupModal">
+    <div class="modal-window modal-backup-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="icon">📤</span>
+          <div>
+            <h3>手動持股備份與匯入</h3>
+            <span class="note-subtitle">將您的持股清單匯出為 JSON 備份檔，或從備份資料還原</span>
+          </div>
+        </div>
+        <button class="btn-close" id="btnCloseBackupModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="backup-section">
+          <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: #f8fafc;">📥 匯出備份 (Export)</h4>
+          <p class="backup-desc" style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8;">將目前的所有手動持股儲存為備份檔案，便於換電腦或保留紀錄。</p>
+          <div class="backup-actions-row" style="display: flex; gap: 10px;">
+            <button class="btn btn-outline" id="btnDownloadBackupJson">💾 下載備份 JSON 檔案</button>
+            <button class="btn btn-outline" id="btnCopyBackupJson">📋 複製 JSON 內容</button>
+          </div>
+        </div>
+
+        <div class="backup-divider" style="margin: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.1);"></div>
+
+        <div class="backup-section">
+          <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: #f8fafc;">📤 匯入備份 (Import)</h4>
+          <p class="backup-desc" style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8;">貼上先前匯出的 JSON 或選擇 JSON 檔案進行還原（現有資料將被更新）。</p>
+          <div style="margin-bottom: 12px;">
+            <input type="file" id="inputFileBackupJson" accept=".json" style="display: none;">
+            <button class="btn btn-outline" id="btnSelectFileImport">📁 選擇本機 JSON 檔案匯入</button>
+          </div>
+          <div class="textarea-box">
+            <textarea id="textareaBackupJson" rows="5" placeholder="或在此處直接貼上 JSON 格式持股備份資料..." style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #f8fafc; font-family: monospace; font-size: 0.85rem; box-sizing: border-box;"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-outline" id="btnCancelBackupModal">關閉</button>
+        <button class="btn btn-primary" id="btnExecuteImportJson">🚀 執行文字匯入</button>
       </div>
     </div>
   </div>
