@@ -97,36 +97,20 @@ function getStockSector(code, name = "") {
   return "其他成長股";
 }
 
-// Rich default watchlist of 12 top Taiwan stocks
-const DEFAULT_WATCHLIST = [
-  { code: "2454", name: "聯發科", note: "IC設計龍頭" },
-  { code: "2308", name: "台達電", note: "散熱/綠能/電源" },
-  { code: "3037", name: "欣興", note: "ABF載板概念" },
-  { code: "2379", name: "瑞昱", note: "網通晶片" },
-  { code: "2603", name: "長榮", note: "航運龍頭" },
-  { code: "2382", name: "廣達", note: "AI代工龍頭" },
-  { code: "3231", name: "緯創", note: "AI伺服器" },
-  { code: "00878", name: "國泰永續高股息", note: "存股熱門ETF" },
-  { code: "00919", name: "群益精選高息", note: "高殖利率ETF" },
-  { code: "2886", name: "兆豐金", note: "官股金控" },
-  { code: "2356", name: "英業達", note: "伺服器代工" },
-  { code: "2408", name: "南亞科", note: "記憶體DRAM" }
-];
-
 function getSavedWatchlist() {
   try {
-    const saved = localStorage.getItem("my_watchlist_stocks");
+    const saved = localStorage.getItem("my_watchlist_stocks_v2");
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {}
-  return DEFAULT_WATCHLIST;
+  return [];
 }
 
 function saveWatchlist(list) {
   try {
-    localStorage.setItem("my_watchlist_stocks", JSON.stringify(list));
+    localStorage.setItem("my_watchlist_stocks_v2", JSON.stringify(list));
   } catch (e) {}
 }
 
@@ -1519,7 +1503,9 @@ function renderActiveTabContent() {
 
   if (currentTab === "watchlist") {
     if (bannerTitle) {
-      bannerTitle.textContent = `【未持股觀察雷達】目前追蹤 ${watchlistStocks.length} 檔優質標的（嚴格把關進場買點與損益比，可自由新增/移除股票）`;
+      bannerTitle.textContent = watchlistStocks.length > 0
+        ? `【未持股觀察雷達】目前追蹤 ${watchlistStocks.length} 檔優質標的（嚴格把關進場買點與損益比，可自由新增/移除股票）`
+        : `【未持股觀察雷達】目前尚未加入觀察股票（請在下方輸入代號加入）`;
     }
     renderWatchlistView();
     return;
@@ -1956,6 +1942,19 @@ async function renderWatchlistView() {
   document.getElementById("subTotalDividend").textContent = "等待伺機進場";
 
   const tbody = document.getElementById("stockTableBody");
+  if (watchlistStocks.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="13" style="text-align: center; padding: 48px 16px;">
+          <div style="font-size: 2.2rem; margin-bottom: 10px;">🎯</div>
+          <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">目前尚無觀察股票</div>
+          <div style="font-size: 0.88rem; color: #94a3b8;">請在上方輸入台股代號（例：2330），點擊「＋加入雷達」開始追蹤！</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
   tbody.innerHTML = `<tr><td colspan="13" class="text-center">正在評估觀察名單之最佳買點與殖利率...</td></tr>`;
 
   const rowsHtml = [];
