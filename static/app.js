@@ -37,9 +37,9 @@ const DEFAULT_MANUAL_HOLDINGS = [
 function getSavedManualHoldings() {
   try {
     const saved = localStorage.getItem(LS_MANUAL_HOLDINGS_KEY);
-    if (saved) {
+    if (saved !== null) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {}
   return DEFAULT_MANUAL_HOLDINGS;
@@ -51,7 +51,7 @@ function saveManualHoldings(list) {
   } catch (e) {}
 }
 
-let currentManualUnit = "lots"; // 'lots' or 'shares'
+let currentManualUnit = "shares"; // Default to 'shares' (股數) for modern odd-lot trading
 let manualLookupTimer = null;
 
 const SECTOR_MAP = {
@@ -461,11 +461,18 @@ function setupEventListeners() {
   const btnCloseManual = document.getElementById("btnCloseManualModal");
   const btnCancelManual = document.getElementById("btnCancelManualModal");
   const btnSaveManual = document.getElementById("btnSaveManualHolding");
-  if (btnCloseManual) btnCloseManual.addEventListener("click", closeManualHoldingModal);
-  if (btnCancelManual) btnCancelManual.addEventListener("click", closeManualHoldingModal);
+  if (btnCloseManual) btnCloseManual.addEventListener("click", () => closeManualHoldingModal(false));
+  if (btnCancelManual) btnCancelManual.addEventListener("click", () => closeManualHoldingModal(false));
   if (modalManual) {
+    // Prevent accidental closing when clicking outside! Keep user's input completely safe
     modalManual.addEventListener("click", (e) => {
-      if (e.target === modalManual) closeManualHoldingModal();
+      if (e.target === modalManual || !e.target.closest(".modal-manual-window")) {
+        const win = modalManual.querySelector(".modal-manual-window");
+        if (win) {
+          win.classList.add("modal-shake");
+          setTimeout(() => win.classList.remove("modal-shake"), 300);
+        }
+      }
     });
   }
   if (btnSaveManual) {
@@ -477,6 +484,29 @@ function setupEventListeners() {
   const btnShares = document.getElementById("btnUnitShares");
   if (btnLots) btnLots.addEventListener("click", () => setManualUnit("lots"));
   if (btnShares) btnShares.addEventListener("click", () => setManualUnit("shares"));
+
+  // Quick Quantity Addition Buttons (+100股, +500股, +1000股, 清空)
+  document.querySelectorAll(".btn-quick-qty").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const inputQty = document.getElementById("manualInputQty");
+      if (!inputQty) return;
+      const act = btn.getAttribute("data-qty");
+      if (act === "clear") {
+        inputQty.value = "";
+      } else {
+        const addVal = parseInt(act, 10) || 0;
+        if (currentManualUnit === "shares") {
+          const curr = parseInt(inputQty.value, 10) || 0;
+          inputQty.value = curr + addVal;
+        } else {
+          const curr = parseFloat(inputQty.value) || 0;
+          inputQty.value = (curr + (addVal / 1000)).toFixed(3).replace(/\.?0+$/, "");
+        }
+      }
+      updateManualQtyCostHints();
+    });
+  });
 
   // Real-time calculation hints
   const inputManualQty = document.getElementById("manualInputQty");
@@ -525,8 +555,11 @@ function setupEventListeners() {
         reader.onload = (evt) => {
           const textarea = document.getElementById("textareaBackupJson");
           if (textarea) textarea.value = evt.target.result;
+          executeImportJson();
         };
         reader.readAsText(file);
+        // Reset input value so re-selecting same file triggers change
+        e.target.value = "";
       }
     });
   }
@@ -622,15 +655,21 @@ function setupEventListeners() {
     });
   }
 
-  // Global Escape key: closes stock modal, note modal, glossary modal, or bot modal
+  // Global Escape key: closes any open modal window
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      const manualModal = document.getElementById("manualHoldingModal");
+      const manualBackupModal = document.getElementById("manualBackupModal");
       const stockModal = document.getElementById("stockModal");
       const noteModal = document.getElementById("stockNoteModal");
       const glossaryModal = document.getElementById("glossaryModal");
       const botModal = document.getElementById("botModal");
 
-      if (glossaryModal && glossaryModal.classList.contains("active")) {
+      if (manualModal && manualModal.classList.contains("active")) {
+        closeManualHoldingModal(false);
+      } else if (manualBackupModal && manualBackupModal.classList.contains("active")) {
+        closeManualBackupModal();
+      } else if (glossaryModal && glossaryModal.classList.contains("active")) {
         closeGlossaryModal();
       } else if (noteModal && noteModal.classList.contains("active")) {
         closeStockNoteModal();
@@ -917,13 +956,8 @@ function openManualHoldingModal(editingItem = null) {
     }
 
     const shares = editingItem.shares || 1000;
-    if (shares % 1000 === 0 && shares >= 1000) {
-      setManualUnit("lots");
-      if (inputQty) inputQty.value = shares / 1000;
-    } else {
-      setManualUnit("shares");
-      if (inputQty) inputQty.value = shares;
-    }
+    setManualUnit("shares");
+    if (inputQty) inputQty.value = shares;
 
     if (inputCost) inputCost.value = editingItem.cost_price || "";
     if (inputAccount) inputAccount.value = editingItem.owner || "我的持股";
@@ -940,8 +974,8 @@ function openManualHoldingModal(editingItem = null) {
       inputName.value = "";
       inputName.dataset.autofilled = "false";
     }
-    setManualUnit("lots");
-    if (inputQty) inputQty.value = "1";
+    setManualUnit("shares");
+    if (inputQty) inputQty.value = "1000";
     if (inputCost) inputCost.value = "";
     if (inputAccount) {
       inputAccount.value = (currentTab !== "all" && currentTab !== "watchlist") ? currentTab : "我的持股";
@@ -956,9 +990,19 @@ function openManualHoldingModal(editingItem = null) {
   }
 }
 
-function closeManualHoldingModal() {
+function closeManualHoldingModal(force = false) {
   const modal = document.getElementById("manualHoldingModal");
-  if (modal) modal.classList.remove("active");
+  if (!modal) return;
+  const inputCode = document.getElementById("manualInputCode");
+  const inputCost = document.getElementById("manualInputCost");
+  const hasInput = (inputCode && inputCode.value.trim() && !inputCode.readOnly) || (inputCost && inputCost.value.trim());
+
+  if (!force && hasInput) {
+    if (!confirm("尚有未儲存的持股輸入內容，確定要放棄並關閉視窗嗎？")) {
+      return;
+    }
+  }
+  modal.classList.remove("active");
 }
 
 function setManualUnit(unit) {
@@ -973,7 +1017,7 @@ function setManualUnit(unit) {
     if (btnShares) btnShares.classList.remove("active");
     if (unitLabel) unitLabel.textContent = "張";
     if (inputQty) {
-      inputQty.placeholder = "例: 1";
+      inputQty.placeholder = "例: 1 或 0.5";
       inputQty.step = "any";
     }
   } else {
@@ -981,7 +1025,7 @@ function setManualUnit(unit) {
     if (btnShares) btnShares.classList.add("active");
     if (unitLabel) unitLabel.textContent = "股";
     if (inputQty) {
-      inputQty.placeholder = "例: 1000";
+      inputQty.placeholder = "例: 1000、500、100";
       inputQty.step = "1";
     }
   }
@@ -1002,8 +1046,12 @@ function updateManualQtyCostHints() {
     if (currentManualUnit === "lots") {
       hintQty.textContent = `換算：${totalShares.toLocaleString()} 股`;
     } else {
-      const lots = (totalShares / 1000).toFixed(3).replace(/\.?0+$/, "");
-      hintQty.textContent = `換算：${lots} 張 (${totalShares.toLocaleString()} 股)`;
+      if (totalShares === 0) {
+        hintQty.textContent = "換算：--";
+      } else {
+        const lots = (totalShares / 1000).toFixed(3).replace(/\.?0+$/, "");
+        hintQty.textContent = `換算：${lots} 張 (${totalShares.toLocaleString()} 股)`;
+      }
     }
   }
 
@@ -1110,7 +1158,7 @@ async function saveManualHoldingFromForm() {
   }
 
   saveManualHoldings(holdings);
-  closeManualHoldingModal();
+  closeManualHoldingModal(true);
   loadManualPortfolioData(true);
 }
 
@@ -1163,13 +1211,13 @@ function copyBackupJson() {
   const holdings = getSavedManualHoldings();
   const jsonStr = JSON.stringify(holdings, null, 2);
   navigator.clipboard.writeText(jsonStr).then(() => {
-    alert("持股 JSON 備份內容已複製到剪貼簿！");
+    alert("持股備份代碼已複製到剪貼簿！");
   }).catch(() => {
     const textarea = document.getElementById("textareaBackupJson");
     if (textarea) {
       textarea.select();
       document.execCommand("copy");
-      alert("持股 JSON 備份內容已複製到剪貼簿！");
+      alert("持股備份代碼已複製到剪貼簿！");
     }
   });
 }
@@ -1177,7 +1225,7 @@ function copyBackupJson() {
 function executeImportJson() {
   const textarea = document.getElementById("textareaBackupJson");
   if (!textarea || !textarea.value.trim()) {
-    alert("請先貼上或選擇 JSON 備份檔案內容！");
+    alert("請先選取備份檔案或貼上備份內容！");
     return;
   }
 
@@ -1191,7 +1239,7 @@ function executeImportJson() {
     }
 
     if (!list || list.length === 0) {
-      alert("格式錯誤：備份內容必須包含有效的股票清單陣列！");
+      alert("備份檔案格式不正確，未找到持股資料清單。");
       return;
     }
 
@@ -1205,20 +1253,20 @@ function executeImportJson() {
     }));
 
     if (validList.length === 0) {
-      alert("未能在匯入資料中找到有效的持股紀錄（每筆需有股票代號與股數）。");
+      alert("未能在檔案中找到有效的持股紀錄（每筆需有股票代號與股數）。");
       return;
     }
 
-    if (!confirm(`成功解析 ${validList.length} 檔持股，是否確定匯入並覆蓋目前手動持股？`)) {
+    if (!confirm(`成功讀取 ${validList.length} 檔持股紀錄！\n是否確定還原並更新目前的持股名單？`)) {
       return;
     }
 
     saveManualHoldings(validList);
     closeManualBackupModal();
     loadManualPortfolioData(true);
-    alert(`成功匯入 ${validList.length} 檔持股！`);
+    alert(`🎉 成功還原 ${validList.length} 檔持股！即時報價與診斷已同步更新。`);
   } catch (err) {
-    alert(`JSON 解析失敗：${err.message}`);
+    alert(`檔案讀取失敗，請確認是否為本系統下載之備份檔案。`);
   }
 }
 

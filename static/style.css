@@ -1731,6 +1731,16 @@ body {
 .modal-overlay.active {
   opacity: 1;
   pointer-events: auto;
+  cursor: default;
+}
+
+@keyframes modalShake {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.012); box-shadow: 0 0 30px rgba(59, 130, 246, 0.4); }
+}
+
+.modal-shake {
+  animation: modalShake 0.25s ease;
 }
 
 .modal-window {
@@ -1741,6 +1751,7 @@ body {
   max-width: 650px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  cursor: default;
 }
 
 /* Dedicated Stock Detail Large Lightbox Modal Window */
@@ -3448,6 +3459,31 @@ body {
   color: #94a3b8;
   margin-top: 4px;
   min-height: 18px;
+}
+
+.qty-quick-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-quick-qty {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-quick-qty:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 /* Row Action Buttons in Table */

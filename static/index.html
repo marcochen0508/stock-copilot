@@ -674,21 +674,27 @@
             </div>
           </div>
 
-          <!-- Unit Selector: 張數 vs 股數 -->
+          <!-- Unit Selector: 股數 (預設) vs 張數 -->
           <div class="modal-form-grid" style="margin-top: 14px;">
             <div class="form-group">
               <div class="unit-toggle-header">
                 <label for="manualInputQty">持有數量 <span class="required">*</span></label>
                 <div class="unit-pill-selector">
-                  <button type="button" class="unit-pill active" id="btnUnitLots" data-unit="lots">張數 (1張=1000股)</button>
-                  <button type="button" class="unit-pill" id="btnUnitShares" data-unit="shares">股數 (零股/整股)</button>
+                  <button type="button" class="unit-pill active" id="btnUnitShares" data-unit="shares">股數 (零股/整股)</button>
+                  <button type="button" class="unit-pill" id="btnUnitLots" data-unit="lots">張數 (1張=1000股)</button>
                 </div>
               </div>
               <div class="input-with-unit">
-                <input type="number" id="manualInputQty" placeholder="例: 1" step="any" min="0.001" required>
-                <span class="unit-label" id="manualQtyUnitLabel">張</span>
+                <input type="number" id="manualInputQty" value="1000" placeholder="例: 1000、500、100" step="1" min="1" required>
+                <span class="unit-label" id="manualQtyUnitLabel">股</span>
               </div>
-              <div class="qty-calc-hint" id="manualQtyCalcHint">換算：1,000 股</div>
+              <div class="qty-calc-hint" id="manualQtyCalcHint">換算：1 張 (1,000 股)</div>
+              <div class="qty-quick-buttons">
+                <button type="button" class="btn-quick-qty" data-qty="100">+100股</button>
+                <button type="button" class="btn-quick-qty" data-qty="500">+500股</button>
+                <button type="button" class="btn-quick-qty" data-qty="1000">+1,000股 (1張)</button>
+                <button type="button" class="btn-quick-qty" data-qty="clear">清空</button>
+              </div>
             </div>
 
             <div class="form-group">
@@ -732,39 +738,42 @@
         <div class="modal-title">
           <span class="icon">📤</span>
           <div>
-            <h3>手動持股備份與匯入</h3>
-            <span class="note-subtitle">將您的持股清單匯出為 JSON 備份檔，或從備份資料還原</span>
+            <h3>持股資料備份與換電腦還原</h3>
+            <span class="note-subtitle">將您的持股清單下載保存，換電腦時一鍵匯入即可無縫同步</span>
           </div>
         </div>
         <button class="btn-close" id="btnCloseBackupModal">&times;</button>
       </div>
       <div class="modal-body">
         <div class="backup-section">
-          <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: #f8fafc;">📥 匯出備份 (Export)</h4>
-          <p class="backup-desc" style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8;">將目前的所有手動持股儲存為備份檔案，便於換電腦或保留紀錄。</p>
-          <div class="backup-actions-row" style="display: flex; gap: 10px;">
-            <button class="btn btn-outline" id="btnDownloadBackupJson">💾 下載備份 JSON 檔案</button>
-            <button class="btn btn-outline" id="btnCopyBackupJson">📋 複製 JSON 內容</button>
+          <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: #f8fafc;">📥 步驟一：下載持股備份（在原本電腦）</h4>
+          <p class="backup-desc" style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8;">將目前的所有持股、自訂分類與成本價格打包存檔，供換電腦或留存紀錄。</p>
+          <div class="backup-actions-row" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="btnDownloadBackupJson" style="font-weight: 600;">💾 下載持股備份檔</button>
+            <button class="btn btn-outline" id="btnCopyBackupJson">📋 複製備份代碼</button>
           </div>
         </div>
 
         <div class="backup-divider" style="margin: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.1);"></div>
 
         <div class="backup-section">
-          <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: #f8fafc;">📤 匯入備份 (Import)</h4>
-          <p class="backup-desc" style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8;">貼上先前匯出的 JSON 或選擇 JSON 檔案進行還原（現有資料將被更新）。</p>
+          <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: #f8fafc;">📤 步驟二：匯入還原持股（在另一台電腦）</h4>
+          <p class="backup-desc" style="margin: 0 0 12px 0; font-size: 0.85rem; color: #94a3b8;">選取剛才下載的備份檔案，系統將自動同步所有分類與持股。</p>
           <div style="margin-bottom: 12px;">
             <input type="file" id="inputFileBackupJson" accept=".json" style="display: none;">
-            <button class="btn btn-outline" id="btnSelectFileImport">📁 選擇本機 JSON 檔案匯入</button>
+            <button class="btn btn-outline" id="btnSelectFileImport" style="background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">📁 選擇持股備份檔匯入</button>
           </div>
           <div class="textarea-box">
-            <textarea id="textareaBackupJson" rows="5" placeholder="或在此處直接貼上 JSON 格式持股備份資料..." style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #f8fafc; font-family: monospace; font-size: 0.85rem; box-sizing: border-box;"></textarea>
+            <details style="margin-top: 6px; font-size: 0.85rem; color: #94a3b8;">
+              <summary style="cursor: pointer; padding: 4px 0; color: #cbd5e1; user-select: none;">⚙️ 備份內容代碼預覽 / 貼上文字（選填，一般使用者免點開）</summary>
+              <textarea id="textareaBackupJson" rows="5" placeholder="若有複製過備份代碼，亦可直接貼在此處..." style="width: 100%; margin-top: 8px; padding: 10px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #f8fafc; font-family: monospace; font-size: 0.82rem; box-sizing: border-box;"></textarea>
+            </details>
           </div>
         </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
         <button class="btn btn-outline" id="btnCancelBackupModal">關閉</button>
-        <button class="btn btn-primary" id="btnExecuteImportJson">🚀 執行文字匯入</button>
+        <button class="btn btn-primary" id="btnExecuteImportJson">🚀 確定還原持股</button>
       </div>
     </div>
   </div>
