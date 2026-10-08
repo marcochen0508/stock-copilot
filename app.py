@@ -253,27 +253,23 @@ def enrich_raw_portfolios(raw_portfolios: Dict[str, Any]) -> Dict[str, Any]:
         "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
     }
 
-def get_demo_portfolios() -> Dict[str, Any]:
-    """公開展示用的示範投資組合（台積電、元大台灣50）"""
+def get_empty_portfolios() -> Dict[str, Any]:
+    """無任何持股的空白狀態"""
     now = datetime.datetime.now()
-    if CACHE.get("demo") and CACHE.get("demo_time"):
-        if (now - CACHE["demo_time"]).total_seconds() < CACHE_TTL_SECONDS:
-            return CACHE["demo"]
-            
-    demo_raw = {
-        "公開示範帳戶": {
-            "gid": "demo",
-            "holdings": [
-                {"code": "2330", "name": "台積電", "shares": 1000, "cost_price": 850.0, "note": "系統公開示範標的"},
-                {"code": "0050", "name": "元大台灣50", "shares": 1000, "cost_price": 160.0, "note": "系統公開示範標的"}
-            ]
-        }
+    return {
+        "persons": [],
+        "portfolios": {},
+        "aggregate": {
+            "total_cost": 0.0,
+            "total_market_value": 0.0,
+            "total_pnl": 0.0,
+            "total_roi_pct": 0.0,
+            "total_annual_dividend": 0.0,
+            "portfolio_yield": 0.0,
+            "holdings": []
+        },
+        "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
     }
-    demo_result = enrich_raw_portfolios(demo_raw)
-    demo_result["is_demo"] = True
-    CACHE["demo"] = demo_result
-    CACHE["demo_time"] = now
-    return demo_result
 
 SHEET_CACHE: Dict[str, Any] = {}
 
@@ -290,9 +286,9 @@ def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = No
     elif sheet_id:
         target_sheet_id = sheet_id.strip()
 
-    # 方案 A：未輸入個人試算表時，一律展示安全公開示範範本（絕不洩漏個人資料）
+    # 未輸入個人試算表時，一律回傳純空白（絕不預載任何股票）
     if not target_sheet_id:
-        return get_demo_portfolios()
+        return get_empty_portfolios()
 
     # 依使用者輸入的 sheet_id 個別快取（確保彼此完全隔離）
     cache_entry = SHEET_CACHE.get(target_sheet_id)

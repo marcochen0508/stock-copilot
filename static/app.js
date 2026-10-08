@@ -869,7 +869,7 @@ function setupEventListeners() {
 
   if (btnResetDefaultSheet) {
     btnResetDefaultSheet.addEventListener("click", () => {
-      if (confirm("確定要重設並切換回公開示範模式嗎？（將清除本機瀏覽器記錄的試算表網址）")) {
+      if (confirm("確定要清空已綁定的 Google 試算表網址嗎？")) {
         localStorage.removeItem("my_custom_sheet_url");
         localStorage.removeItem(LS_PORTFOLIOS_KEY);
         if (customSheetUrlInput) customSheetUrlInput.value = "";
@@ -1375,12 +1375,12 @@ async function loadSheetsPortfolioData(forceSync = false) {
     try {
       localStorage.setItem(LS_PORTFOLIOS_KEY, JSON.stringify(data));
     } catch(e) {}
-    const isDemo = !!data.is_demo;
+    const hasHoldings = data.aggregate && data.aggregate.holdings && data.aggregate.holdings.length > 0;
     const timePart = data.synced_at ? (data.synced_at.includes(' ') ? data.synced_at.split(' ')[1] : data.synced_at) : '';
-    if (isDemo) {
-      syncStatus.textContent = "💡 公開示範模式（點擊「更換試算表」綁定個人）";
-    } else {
+    if (customUrl && hasHoldings) {
       syncStatus.textContent = `🟢 已連線個人試算表 (更新: ${timePart})`;
+    } else {
+      syncStatus.textContent = "⚪ 尚未綁定試算表（點「更換試算表」開始使用）";
     }
     renderPersonTabs();
     renderActiveTabContent();
@@ -1548,13 +1548,15 @@ function renderActiveTabContent() {
     if (bannerTitle) {
       if (currentSourceMode === "manual") {
         const isProfit = totalPnL >= 0;
-        bannerTitle.textContent = `【手動持股總覽】合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，目前損益: ${isProfit ? '+' : ''}NT$ ${totalPnL.toLocaleString()} 元 / ${isProfit ? '+' : ''}${totalROI}%，預估年領股利 NT$ ${totalAnnualDiv.toLocaleString()} 元`;
-      } else if (currentPortfolios && currentPortfolios.is_demo) {
-        bannerTitle.innerHTML = `💡 <strong>【公開示範展示模式】</strong>目前顯示 2 檔示範標的供功能體驗。欲檢視您個人的真實持股，請點擊上方<strong>「更換試算表」</strong>貼上您的 Google 試算表連結，或切換至<strong>「手動持股」</strong>。`;
+        bannerTitle.textContent = holdings.length > 0
+          ? `【手動持股總覽】合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，目前損益: ${isProfit ? '+' : ''}NT$ ${totalPnL.toLocaleString()} 元 / ${isProfit ? '+' : ''}${totalROI}%，預估年領股利 NT$ ${totalAnnualDiv.toLocaleString()} 元`
+          : `【手動持股總覽】目前尚無持股記錄（點擊右上角「新增持股」開始記錄）`;
       } else {
         const personListStr = currentPortfolios.persons ? currentPortfolios.persons.join("、") : "";
         const personCount = currentPortfolios.persons ? currentPortfolios.persons.length : 0;
-        bannerTitle.textContent = `【全部合併總覽】包含 ${personListStr} 共 ${personCount} 個帳戶（合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，每年預估股利 NT$ ${totalAnnualDiv.toLocaleString()} 元）`;
+        bannerTitle.textContent = holdings.length > 0
+          ? `【全部合併總覽】包含 ${personListStr} 共 ${personCount} 個帳戶（合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，每年預估股利 NT$ ${totalAnnualDiv.toLocaleString()} 元）`
+          : `【全部合併總覽】目前尚未綁定 Google 試算表（點擊右上角「更換試算表」開始使用）`;
       }
     }
   } else {
@@ -1736,19 +1738,43 @@ function renderActiveTabContent() {
     tbody.appendChild(tr);
   });
 
-  // 手動持股為空時的友善引導
-  if (sortedHoldings.length === 0 && currentSourceMode === "manual") {
+  // 持股為空時的友善引導
+  if (sortedHoldings.length === 0) {
     const emptyTr = document.createElement("tr");
-    emptyTr.innerHTML = `
-      <td colspan="${currentTab === 'all' ? 13 : 12}" style="text-align: center; padding: 48px 16px;">
-        <div style="font-size: 2.2rem; margin-bottom: 10px;">💼</div>
-        <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">目前尚無手動持股紀錄</div>
-        <div style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 18px;">點擊下方按鈕新增第一筆持股，即刻啟用零延遲即時報價與完整量化體檢</div>
-        <button class="btn btn-primary" id="btnEmptyAddHolding">➕ 新增第一筆持股</button>
-      </td>
-    `;
-    const btnEmpty = emptyTr.querySelector("#btnEmptyAddHolding");
-    if (btnEmpty) btnEmpty.addEventListener("click", () => openManualHoldingModal());
+    if (currentSourceMode === "manual") {
+      emptyTr.innerHTML = `
+        <td colspan="${currentTab === 'all' ? 13 : 12}" style="text-align: center; padding: 48px 16px;">
+          <div style="font-size: 2.2rem; margin-bottom: 10px;">💼</div>
+          <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">目前尚無手動持股紀錄</div>
+          <div style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 18px;">點擊下方按鈕新增第一筆持股，即刻啟用零延遲即時報價與完整量化體檢</div>
+          <button class="btn btn-primary" id="btnEmptyAddHolding">➕ 新增第一筆持股</button>
+        </td>
+      `;
+      const btnEmpty = emptyTr.querySelector("#btnEmptyAddHolding");
+      if (btnEmpty) btnEmpty.addEventListener("click", () => openManualHoldingModal());
+    } else {
+      emptyTr.innerHTML = `
+        <td colspan="${currentTab === 'all' ? 13 : 12}" style="text-align: center; padding: 48px 16px;">
+          <div style="font-size: 2.2rem; margin-bottom: 10px;">📊</div>
+          <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">尚未綁定 Google 雲端試算表</div>
+          <div style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 18px;">請點擊下方按鈕貼上您的 Google 試算表連結，或切換至手動輸入持股。</div>
+          <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="btnEmptyConfigSheet">⚙️ 綁定 Google 試算表</button>
+            <button class="btn btn-outline" id="btnEmptySwitchManual">✍️ 切換至手動輸入</button>
+          </div>
+        </td>
+      `;
+      const btnCfg = emptyTr.querySelector("#btnEmptyConfigSheet");
+      if (btnCfg) btnCfg.addEventListener("click", () => {
+        const modal = document.getElementById("sheetConfigModal");
+        if (modal) modal.classList.add("active");
+      });
+      const btnManual = emptyTr.querySelector("#btnEmptySwitchManual");
+      if (btnManual) btnManual.addEventListener("click", () => {
+        const tabManual = document.getElementById("tabSourceManual");
+        if (tabManual) tabManual.click();
+      });
+    }
     tbody.appendChild(emptyTr);
   }
 
