@@ -253,12 +253,36 @@ def enrich_raw_portfolios(raw_portfolios: Dict[str, Any]) -> Dict[str, Any]:
         "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
     }
 
+def get_demo_portfolios() -> Dict[str, Any]:
+    """公開展示用的示範投資組合（台積電、元大台灣50）"""
+    now = datetime.datetime.now()
+    if CACHE.get("demo") and CACHE.get("demo_time"):
+        if (now - CACHE["demo_time"]).total_seconds() < CACHE_TTL_SECONDS:
+            return CACHE["demo"]
+            
+    demo_raw = {
+        "公開示範帳戶": {
+            "gid": "demo",
+            "holdings": [
+                {"code": "2330", "name": "台積電", "shares": 1000, "cost_price": 850.0, "note": "系統公開示範標的"},
+                {"code": "0050", "name": "元大台灣50", "shares": 1000, "cost_price": 160.0, "note": "系統公開示範標的"}
+            ]
+        }
+    }
+    demo_result = enrich_raw_portfolios(demo_raw)
+    demo_result["is_demo"] = True
+    CACHE["demo"] = demo_result
+    CACHE["demo_time"] = now
+    return demo_result
+
+SHEET_CACHE: Dict[str, Any] = {}
+
 @app.get("/api/portfolios")
 def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = None, force_sync: bool = False):
     import re
     now = datetime.datetime.now()
     
-    target_sheet_id = sheets_sync.DEFAULT_SHEET_ID
+    target_sheet_id = ""
     if sheet_url:
         m = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', sheet_url)
         if m:
@@ -266,42 +290,23 @@ def api_portfolios(sheet_url: Optional[str] = None, sheet_id: Optional[str] = No
     elif sheet_id:
         target_sheet_id = sheet_id.strip()
 
-    is_default_sheet = (target_sheet_id == sheets_sync.DEFAULT_SHEET_ID)
-
+    # 方案 A：未輸入個人試算表時，一律展示安全公開示範範本（絕不洩漏個人資料）
     if not target_sheet_id:
-        return {
-            "persons": [],
-            "portfolios": {},
-            "aggregate": {
-                "total_cost": 0.0,
-                "total_market_value": 0.0,
-                "total_pnl": 0.0,
-                "total_roi_pct": 0.0,
-                "total_annual_dividend": 0.0,
-                "portfolio_yield": 0.0,
-                "holdings": []
-            },
-            "synced_at": now.strftime("%Y-%m-%d %H:%M:%S")
-        }
+        return get_demo_portfolios()
 
-    if not force_sync and is_default_sheet and CACHE["portfolios"] and CACHE["portfolios_time"]:
-        if (now - CACHE["portfolios_time"]).total_seconds() < CACHE_TTL_SECONDS:
-            return CACHE["portfolios"]
+    # 依使用者輸入的 sheet_id 個別快取（確保彼此完全隔離）
+    cache_entry = SHEET_CACHE.get(target_sheet_id)
+    if not force_sync and cache_entry:
+        cached_data, cached_time = cache_entry
+        if (now - cached_time).total_seconds() < CACHE_TTL_SECONDS:
+            return cached_data
             
     try:
         raw_portfolios = sheets_sync.get_all_sheet_portfolios(sheet_id=target_sheet_id)
         result = enrich_raw_portfolios(raw_portfolios)
-        
-        CACHE["portfolios"] = result
-        CACHE["portfolios_time"] = now
-        try:
-            with open(PORTFOLIOS_CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.warning(f"Could not save portfolios cache to disk: {e}")
-            
+        result["is_demo"] = False
+        SHEET_CACHE[target_sheet_id] = (result, now)
         return result
-        
     except Exception as e:
         logger.error(f"Error syncing portfolios: {e}")
         raise HTTPException(status_code=500, detail=str(e))

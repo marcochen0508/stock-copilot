@@ -869,7 +869,7 @@ function setupEventListeners() {
 
   if (btnResetDefaultSheet) {
     btnResetDefaultSheet.addEventListener("click", () => {
-      if (confirm("確定要重設並切換回系統內建的預設範例試算表嗎？")) {
+      if (confirm("確定要重設並切換回公開示範模式嗎？（將清除本機瀏覽器記錄的試算表網址）")) {
         localStorage.removeItem("my_custom_sheet_url");
         localStorage.removeItem(LS_PORTFOLIOS_KEY);
         if (customSheetUrlInput) customSheetUrlInput.value = "";
@@ -1375,8 +1375,13 @@ async function loadSheetsPortfolioData(forceSync = false) {
     try {
       localStorage.setItem(LS_PORTFOLIOS_KEY, JSON.stringify(data));
     } catch(e) {}
-    const isCustom = !!customUrl;
-    syncStatus.textContent = `🟢 已連線${isCustom ? '個人' : ''}試算表 (更新: ${data.synced_at.split(' ')[1]})`;
+    const isDemo = !!data.is_demo;
+    const timePart = data.synced_at ? (data.synced_at.includes(' ') ? data.synced_at.split(' ')[1] : data.synced_at) : '';
+    if (isDemo) {
+      syncStatus.textContent = "💡 公開示範模式（點擊「更換試算表」綁定個人）";
+    } else {
+      syncStatus.textContent = `🟢 已連線個人試算表 (更新: ${timePart})`;
+    }
     renderPersonTabs();
     renderActiveTabContent();
   } catch (err) {
@@ -1544,6 +1549,8 @@ function renderActiveTabContent() {
       if (currentSourceMode === "manual") {
         const isProfit = totalPnL >= 0;
         bannerTitle.textContent = `【手動持股總覽】合計 ${holdings.length} 檔持股，總市值 NT$ ${totalVal.toLocaleString()} 元，目前損益: ${isProfit ? '+' : ''}NT$ ${totalPnL.toLocaleString()} 元 / ${isProfit ? '+' : ''}${totalROI}%，預估年領股利 NT$ ${totalAnnualDiv.toLocaleString()} 元`;
+      } else if (currentPortfolios && currentPortfolios.is_demo) {
+        bannerTitle.innerHTML = `💡 <strong>【公開示範展示模式】</strong>目前顯示 2 檔示範標的供功能體驗。欲檢視您個人的真實持股，請點擊上方<strong>「更換試算表」</strong>貼上您的 Google 試算表連結，或切換至<strong>「手動持股」</strong>。`;
       } else {
         const personListStr = currentPortfolios.persons ? currentPortfolios.persons.join("、") : "";
         const personCount = currentPortfolios.persons ? currentPortfolios.persons.length : 0;
