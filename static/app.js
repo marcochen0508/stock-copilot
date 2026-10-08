@@ -1419,7 +1419,7 @@ async function loadManualPortfolioData(forceSync = false) {
   }
 }
 
-// Render dynamic tabs: [全部總覽], [阿良], [甘露涓], [景維], [阿輝], [未持股觀察名單]
+// Render dynamic tabs: [全部總覽], [帳戶分頁...], [未持股觀察名單]
 function renderPersonTabs() {
   if (!currentPortfolios) return;
   const tabsContainer = document.getElementById("personTabs");
@@ -1462,7 +1462,7 @@ function renderPersonTabs() {
   allBtn.addEventListener("click", () => switchTab("all"));
   tabsContainer.appendChild(allBtn);
 
-  // 2. Individual person tab buttons (阿良, 甘露涓, 景維, 阿輝)
+  // 2. Individual person tab buttons
   currentPortfolios.persons.forEach(person => {
     const p = currentPortfolios.portfolios[person];
     const pCount = p ? p.holdings.length : 0;
