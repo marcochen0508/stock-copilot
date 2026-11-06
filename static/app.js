@@ -1655,7 +1655,7 @@ function renderActiveTabContent() {
       <td class="stock-num">${h.shares.toLocaleString()}</td>
       <td class="stock-num">${h.cost_price.toLocaleString()}</td>
       <td class="stock-num font-bold">${h.current_price.toLocaleString()}</td>
-      <td class="stock-num font-semibold" title="${h.book_value > 0 ? `每股淨值 NT$ ${h.book_value}${h.pb > 0 ? ` (市淨比 PB: ${h.pb})` : ''}` : '每股淨值'}">${h.book_value && h.book_value > 0 ? Number(h.book_value).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '-'}</td>
+      <td class="stock-num font-semibold" title="${h.book_value > 0 ? `每股淨值 NT$ ${h.book_value}` : '每股淨值'}">${(h.book_value && h.book_value > 0) ? Number(h.book_value).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '-'}</td>
       <td class="stock-num ${changeClass}">${h.change >= 0 ? '+' : ''}${h.change} (${h.pct_change >= 0 ? '+' : ''}${h.pct_change}%)</td>
       <td class="stock-num ${pnlClass}">${isHProfit ? '+' : ''}${h.pnl.toLocaleString()}</td>
       <td class="stock-num ${pnlClass}">${isHProfit ? '+' : ''}${h.roi_pct}%</td>
@@ -1992,7 +1992,7 @@ async function renderWatchlistView() {
           <td class="stock-num">-</td>
           <td class="stock-num">-</td>
           <td class="stock-num font-bold">${s.price}</td>
-          <td class="stock-num font-semibold" title="${(s.book_value || (s.valuation && s.valuation.book_value)) ? `每股淨值 NT$ ${s.book_value || s.valuation.book_value}${(s.pb || (s.valuation && s.valuation.pb)) ? ` (市淨比 PB: ${s.pb || s.valuation.pb})` : ''}` : '每股淨值'}">${(s.book_value || (s.valuation && s.valuation.book_value)) ? Number(s.book_value || s.valuation.book_value).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '-'}</td>
+          <td class="stock-num font-semibold" title="${(s.book_value || (s.valuation && s.valuation.book_value)) ? `每股淨值 NT$ ${s.book_value || s.valuation.book_value}` : '每股淨值'}">${(s.book_value || (s.valuation && s.valuation.book_value)) ? Number(s.book_value || s.valuation.book_value).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '-'}</td>
           <td class="stock-num ${changeClass}">${s.change >= 0 ? '+' : ''}${s.change} (${s.pct_change}%)</td>
           <td class="stock-num">-</td>
           <td class="stock-num">-</td>

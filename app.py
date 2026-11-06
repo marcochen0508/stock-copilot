@@ -550,7 +550,7 @@ def favicon():
 def read_root():
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"message": "台股智能決策戰情室後端已就緒"}
 
 if __name__ == "__main__":
