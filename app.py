@@ -145,6 +145,8 @@ def enrich_raw_portfolios(raw_portfolios: Dict[str, Any]) -> Dict[str, Any]:
                 annual_div = stock_data.get("annual_dividend", 0.0)
                 div_yield = stock_data.get("dividend_yield", 0.0)
                 est_annual_div = round(annual_div * shares, 0)
+                book_val = stock_data.get("book_value", 0.0) or (stock_data.get("valuation", {}).get("book_value", 0.0))
+                pb = stock_data.get("pb", 0.0) or (stock_data.get("valuation", {}).get("pb", 0.0))
                 
                 item = {
                     "code": code,
@@ -152,6 +154,8 @@ def enrich_raw_portfolios(raw_portfolios: Dict[str, Any]) -> Dict[str, Any]:
                     "shares": shares,
                     "cost_price": cost,
                     "current_price": stock_data["price"],
+                    "book_value": book_val,
+                    "pb": pb,
                     "prev_price": stock_data["prev_price"],
                     "change": stock_data["change"],
                     "pct_change": stock_data["pct_change"],
@@ -184,12 +188,15 @@ def enrich_raw_portfolios(raw_portfolios: Dict[str, Any]) -> Dict[str, Any]:
                 tab_total_annual_div += est_annual_div
             else:
                 # Fallback if quote failed
+                fb_book = market_engine.FALLBACK_BOOK_VALUES.get(code, 0.0)
                 item = {
                     "code": code,
                     "name": name,
                     "shares": shares,
                     "cost_price": cost,
                     "current_price": cost,
+                    "book_value": fb_book,
+                    "pb": round(cost / fb_book, 2) if fb_book > 0 else 0.0,
                     "prev_price": cost,
                     "change": 0.0,
                     "pct_change": 0.0,

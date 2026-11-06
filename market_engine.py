@@ -437,6 +437,14 @@ STOCK_DIVIDEND_CACHE: Dict[str, float] = {}
 STOCK_FUNDAMENTAL_CACHE: Dict[str, Dict[str, Any]] = {}
 TWSE_REALTIME_CACHE: Dict[str, Dict[str, Any]] = {}
 
+FALLBACK_BOOK_VALUES: Dict[str, float] = {
+    "2330": 185.0, "2317": 116.0, "2454": 268.0, "2303": 28.5, "2881": 58.2, "2891": 25.6,
+    "2603": 245.0, "5347": 52.0, "2324": 27.2, "2328": 32.0, "3481": 24.5, "6770": 21.0,
+    "3033": 51.0, "2374": 42.0, "3702": 39.5, "2409": 22.8, "9933": 31.0,
+    "0050": 196.0, "0056": 38.6, "00878": 22.9, "00919": 24.6, "00929": 19.9, "0052": 185.0,
+    "006208": 115.0
+}
+
 def get_stock_valuation_and_targets(target_sym: str, clean_code: str, cur_price: float, df: pd.DataFrame, ma20: float, ma60: float, support: float, resistance: float) -> Dict[str, Any]:
     """
     Institutional 3-tier quantitative valuation model (Fundamental EPS x PE Bands + Technical Fibonacci Targets).
@@ -460,7 +468,10 @@ def get_stock_valuation_and_targets(target_sym: str, clean_code: str, cur_price:
     eps = fund_info.get("forwardEps") or fund_info.get("trailingEps") or 0.0
     trailing_pe = fund_info.get("trailingPE") or 0.0
     forward_pe = fund_info.get("forwardPE") or 0.0
-    book_value = fund_info.get("bookValue") or 0.0
+    book_value = fund_info.get("bookValue") or fund_info.get("navPrice") or fund_info.get("netAssetValue") or 0.0
+    if not book_value:
+        book_value = FALLBACK_BOOK_VALUES.get(clean_code, 0.0)
+    pb = round(float(cur_price / book_value), 2) if book_value and book_value > 0 else 0.0
     shares = fund_info.get("sharesOutstanding") or 0
     market_cap = fund_info.get("marketCap") or (cur_price * shares if shares > 0 else 0)
     
@@ -530,6 +541,7 @@ def get_stock_valuation_and_targets(target_sym: str, clean_code: str, cur_price:
         "pe": round(float(trailing_pe), 1) if trailing_pe else (round(float(cur_price / eps), 1) if eps > 0 else 0.0),
         "forward_pe": round(float(forward_pe), 1) if forward_pe else 0.0,
         "book_value": round(float(book_value), 2) if book_value else 0.0,
+        "pb": pb,
         "shares": shares,
         "market_cap_text": market_cap_text,
         "val_low": val_low,
@@ -735,6 +747,8 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
     dividend_yield = round((annual_dividend / cur_price * 100), 2) if cur_price > 0 else 0.0
     inst_data = get_institutional_data(clean_code)
 
+    val = get_stock_valuation_and_targets(target_sym, clean_code, cur_price, df, ma20, ma60, support, resistance)
+
     return {
         "symbol": target_sym,
         "code": clean_code,
@@ -756,9 +770,11 @@ def get_stock_history_and_indicators(code: str, period: str = "6mo", interval: s
         "d": d_val,
         "annual_dividend": annual_dividend,
         "dividend_yield": dividend_yield,
+        "book_value": val.get("book_value", 0.0),
+        "pb": val.get("pb", 0.0),
         "candles": candles,
         "institutional": inst_data,
-        "valuation": get_stock_valuation_and_targets(target_sym, clean_code, cur_price, df, ma20, ma60, support, resistance)
+        "valuation": val
     }
 
 def diagnose_stock_holding(stock_info: Dict[str, Any], cost_price: float, shares: int = 1000) -> Dict[str, Any]:

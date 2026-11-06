@@ -132,6 +132,11 @@ let currentSort = {
 // 股票小白白話辭典資料庫 (生動大白話比喻 + 實戰操作指南)
 // -------------------------------------------------------------
 const STOCK_GLOSSARY = {
+  "book_value": {
+    term: "每股淨值 (BPS / NAV)",
+    plain: "【公司的真實家底與清算價值！】把一家公司的所有資產扣除所有負債後，剩下的股東權益除以總發行股數，就是每股淨值。如果是一家基金或 ETF，則代表每一股對應的真實淨資產價值（NAV）。",
+    action: "【股價淨值比 (P/B)】如果目前股價低於每股淨值（股價淨值比 < 1），代表股價比公司清算家底還便宜，常被視為被低估或具備高安全邊際的防守買點；但若為虧損公司，淨值也可能逐季縮水，宜搭配獲利能力綜合評估。"
+  },
   "yield": {
     term: "現金殖利率",
     plain: "【就像銀行存款利率！】把錢買這檔股票，每年能拿到多少%的現金利息。計算公式是（每年發放的現金股利 ÷ 目前股價）。例如買 100 元的股票，今年發 5 元現金，殖利率就是 5%。",
@@ -1650,6 +1655,7 @@ function renderActiveTabContent() {
       <td class="stock-num">${h.shares.toLocaleString()}</td>
       <td class="stock-num">${h.cost_price.toLocaleString()}</td>
       <td class="stock-num font-bold">${h.current_price.toLocaleString()}</td>
+      <td class="stock-num font-semibold" title="${h.book_value > 0 ? `每股淨值 NT$ ${h.book_value}${h.pb > 0 ? ` (市淨比 PB: ${h.pb})` : ''}` : '每股淨值'}">${h.book_value && h.book_value > 0 ? Number(h.book_value).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '-'}</td>
       <td class="stock-num ${changeClass}">${h.change >= 0 ? '+' : ''}${h.change} (${h.pct_change >= 0 ? '+' : ''}${h.pct_change}%)</td>
       <td class="stock-num ${pnlClass}">${isHProfit ? '+' : ''}${h.pnl.toLocaleString()}</td>
       <td class="stock-num ${pnlClass}">${isHProfit ? '+' : ''}${h.roi_pct}%</td>
@@ -1729,7 +1735,7 @@ function renderActiveTabContent() {
     const emptyTr = document.createElement("tr");
     if (currentSourceMode === "manual") {
       emptyTr.innerHTML = `
-        <td colspan="${currentTab === 'all' ? 13 : 12}" style="text-align: center; padding: 48px 16px;">
+        <td colspan="${currentTab === 'all' ? 14 : 13}" style="text-align: center; padding: 48px 16px;">
           <div style="font-size: 2.2rem; margin-bottom: 10px;">💼</div>
           <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">目前尚無手動持股紀錄</div>
           <div style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 18px;">點擊下方按鈕新增第一筆持股，即刻啟用零延遲即時報價與完整量化體檢</div>
@@ -1740,7 +1746,7 @@ function renderActiveTabContent() {
       if (btnEmpty) btnEmpty.addEventListener("click", () => openManualHoldingModal());
     } else {
       emptyTr.innerHTML = `
-        <td colspan="${currentTab === 'all' ? 13 : 12}" style="text-align: center; padding: 48px 16px;">
+        <td colspan="${currentTab === 'all' ? 14 : 13}" style="text-align: center; padding: 48px 16px;">
           <div style="font-size: 2.2rem; margin-bottom: 10px;">📊</div>
           <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">尚未綁定 Google 雲端試算表</div>
           <div style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 18px;">請點擊下方按鈕貼上您的 Google 試算表連結，或切換至手動輸入持股。</div>
@@ -1986,6 +1992,7 @@ async function renderWatchlistView() {
           <td class="stock-num">-</td>
           <td class="stock-num">-</td>
           <td class="stock-num font-bold">${s.price}</td>
+          <td class="stock-num font-semibold" title="${(s.book_value || (s.valuation && s.valuation.book_value)) ? `每股淨值 NT$ ${s.book_value || s.valuation.book_value}${(s.pb || (s.valuation && s.valuation.pb)) ? ` (市淨比 PB: ${s.pb || s.valuation.pb})` : ''}` : '每股淨值'}">${(s.book_value || (s.valuation && s.valuation.book_value)) ? Number(s.book_value || s.valuation.book_value).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '-'}</td>
           <td class="stock-num ${changeClass}">${s.change >= 0 ? '+' : ''}${s.change} (${s.pct_change}%)</td>
           <td class="stock-num">-</td>
           <td class="stock-num">-</td>
@@ -2215,12 +2222,13 @@ function renderStockDetail(result, holdingContext = null, shouldOpenModal = true
     const valEpsPeText = document.getElementById("valEpsPeText");
     if (valEpsPeText) {
       if (val.is_etf) {
-        valEpsPeText.textContent = `ETF 指數型資產 | 歷史波動統計估值`;
+        valEpsPeText.textContent = `ETF 指數型資產 | 歷史波動統計估值${val.book_value > 0 ? ` | 每股淨值: ${val.book_value} 元` : ''}`;
       } else {
         const epsStr = val.eps > 0 ? `${val.eps} 元` : '未揭露';
         const peStr = val.pe > 0 ? `${val.pe} 倍` : '無';
         const mcapStr = val.market_cap_text || '--';
-        valEpsPeText.textContent = `預估EPS: ${epsStr} | 本益比: ${peStr} | 總市值: ${mcapStr}`;
+        const bpsStr = val.book_value > 0 ? ` | 每股淨值: ${val.book_value} 元` : '';
+        valEpsPeText.textContent = `預估EPS: ${epsStr} | 本益比: ${peStr} | 總市值: ${mcapStr}${bpsStr}`;
       }
     }
 
